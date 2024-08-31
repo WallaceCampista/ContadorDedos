@@ -43,6 +43,7 @@ while True:
                             contador += 1
                     contador_direita = contador
 
+
     # Calcula a soma dos contadores
     soma_contadores = contador_esquerda + contador_direita
 
