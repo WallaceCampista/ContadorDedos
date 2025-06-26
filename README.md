@@ -1,4 +1,4 @@
-# Caça CORS
+# Contador de Dedos
 
 ## Sumário
 - [Sobre o Projeto](#sobre-o-projeto)
