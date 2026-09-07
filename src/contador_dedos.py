@@ -25,10 +25,10 @@ import time
 import urllib.error
 import urllib.request
 from collections import Counter, deque
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Deque, Dict, Iterator, List, Optional, Sequence, Tuple
 
 import cv2
 import mediapipe as mp
@@ -60,14 +60,14 @@ MODEL_SHA256 = "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1
 # ---------------------------------------------------------------------------
 
 #: Pontas do indicador, médio, anelar e mínimo.
-FINGER_TIP_IDS: Tuple[int, ...] = (8, 12, 16, 20)
+FINGER_TIP_IDS: tuple[int, ...] = (8, 12, 16, 20)
 #: A articulação PIP de cada dedo fica dois índices antes da ponta.
 PIP_OFFSET = 2
 #: Ponta e articulação interfalângica do polegar.
 THUMB_TIP, THUMB_IP = 4, 3
 
 #: Um landmark já convertido para pixels da imagem.
-Point = Tuple[int, int]
+Point = tuple[int, int]
 
 # ---------------------------------------------------------------------------
 # Aparência
@@ -181,9 +181,9 @@ class CountSmoother:
     def __init__(self, window: int = 5) -> None:
         if window < 1:
             raise ValueError("A janela de suavização precisa ser >= 1.")
-        self._history: Deque[Optional[int]] = deque(maxlen=window)
+        self._history: deque[int | None] = deque(maxlen=window)
 
-    def update(self, value: Optional[int]) -> Optional[int]:
+    def update(self, value: int | None) -> int | None:
         self._history.append(value)
         return Counter(self._history).most_common(1)[0][0]
 
@@ -194,9 +194,9 @@ class FpsMeter:
     def __init__(self, smoothing: float = 0.9) -> None:
         self._smoothing = smoothing
         self._fps = 0.0
-        self._last: Optional[float] = None
+        self._last: float | None = None
 
-    def tick(self, now: Optional[float] = None) -> float:
+    def tick(self, now: float | None = None) -> float:
         now = time.perf_counter() if now is None else now
         if self._last is not None:
             elapsed = now - self._last
@@ -211,11 +211,9 @@ class FpsMeter:
         return self._fps
 
 
-def landmarks_to_pixels(landmarks, width: int, height: int) -> List[Point]:
+def landmarks_to_pixels(landmarks, width: int, height: int) -> list[Point]:
     """Converte landmarks normalizados do MediaPipe para pixels da imagem."""
-    return [
-        (int(landmark.x * width), int(landmark.y * height)) for landmark in landmarks
-    ]
+    return [(int(landmark.x * width), int(landmark.y * height)) for landmark in landmarks]
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +226,7 @@ def draw_text(
     text: str,
     org: Point,
     scale: float = 0.6,
-    color: Tuple[int, int, int] = COLOR_TEXT,
+    color: tuple[int, int, int] = COLOR_TEXT,
     thickness: int = 1,
 ) -> None:
     """Escreve com contorno preto, para o texto não sumir em fundos claros."""
@@ -248,10 +246,10 @@ def hud_scale(height: int) -> float:
 def draw_counter(
     img,
     label: str,
-    value: Optional[int],
+    value: int | None,
     x: int,
     scale: float,
-    color: Tuple[int, int, int] = COLOR_TEXT,
+    color: tuple[int, int, int] = COLOR_TEXT,
 ) -> None:
     """Desenha um rótulo e, logo abaixo, o valor daquele contador."""
     draw_text(img, label, (x, int(30 * scale)), 0.5 * scale, thickness=max(1, int(scale)))
@@ -265,14 +263,16 @@ def draw_counter(
     )
 
 
-def draw_hud(img, counts: Dict[str, Optional[int]], fps: float, mirrored: bool) -> None:
+def draw_hud(img, counts: dict[str, int | None], fps: float, mirrored: bool) -> None:
     """Desenha contadores, total, FPS e a barra de dicas sobre o frame."""
     height, width = img.shape[:2]
     scale = hud_scale(height)
 
     # Cada painel fica do lado da tela em que aquela mão realmente aparece.
     left_hand, right_hand = ("Left", "Right") if mirrored else ("Right", "Left")
-    draw_counter(img, "Esquerda" if mirrored else "Direita", counts[left_hand], int(10 * scale), scale)
+    draw_counter(
+        img, "Esquerda" if mirrored else "Direita", counts[left_hand], int(10 * scale), scale
+    )
     draw_counter(
         img,
         "Direita" if mirrored else "Esquerda",
@@ -287,7 +287,9 @@ def draw_hud(img, counts: Dict[str, Optional[int]], fps: float, mirrored: bool) 
     footer_y = height - int(12 * scale)
     footer_scale = 0.5 * scale
     thickness = max(1, int(scale))
-    draw_text(img, f"{fps:4.1f} FPS", (int(10 * scale), footer_y), footer_scale, COLOR_HINT, thickness)
+    draw_text(
+        img, f"{fps:4.1f} FPS", (int(10 * scale), footer_y), footer_scale, COLOR_HINT, thickness
+    )
     hint = "Q ou ESC para sair"
     (hint_width, _), _ = cv2.getTextSize(hint, FONT, footer_scale, thickness)
     draw_text(
@@ -453,7 +455,7 @@ def run(config: AppConfig) -> None:
                 )
                 result = landmarker.detect_for_video(image, last_timestamp_ms)
 
-                counts: Dict[str, Optional[int]] = {"Left": None, "Right": None}
+                counts: dict[str, int | None] = {"Left": None, "Right": None}
                 for hand_landmarks, handedness in zip(result.hand_landmarks, result.handedness):
                     drawing_utils.draw_landmarks(
                         frame,
@@ -466,9 +468,7 @@ def run(config: AppConfig) -> None:
                     points = landmarks_to_pixels(hand_landmarks, width, height)
                     counts[real_hand(label, config.mirror)] = count_fingers(points, label)
 
-                smoothed = {
-                    hand: smoothers[hand].update(value) for hand, value in counts.items()
-                }
+                smoothed = {hand: smoothers[hand].update(value) for hand, value in counts.items()}
                 draw_hud(frame, smoothed, fps_meter.tick(), config.mirror)
 
                 cv2.imshow(WINDOW_NAME, frame)
@@ -483,7 +483,7 @@ def run(config: AppConfig) -> None:
 # ---------------------------------------------------------------------------
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> AppConfig:
+def parse_args(argv: Sequence[str] | None = None) -> AppConfig:
     """Traduz os argumentos de linha de comando em um :class:`AppConfig`."""
     defaults = AppConfig()
     parser = argparse.ArgumentParser(
@@ -572,7 +572,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> AppConfig:
     )
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Ponto de entrada: devolve 0 em caso de sucesso, 1 em caso de erro."""
     config = parse_args(argv)
     try:

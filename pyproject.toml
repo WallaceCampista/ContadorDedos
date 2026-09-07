@@ -1,0 +1,90 @@
+# Metadados, dependências e configuração das ferramentas de qualidade.
+# Fonte única da verdade: o requirements.txt apenas aponta para cá.
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contador-dedos"
+version = "0.2.0"
+description = "Conta os dedos levantados em tempo real usando a webcam, com OpenCV e MediaPipe."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE.md"]
+requires-python = ">=3.9,<3.13"
+authors = [{ name = "Wallace Campista" }]
+keywords = ["opencv", "mediapipe", "visao-computacional", "webcam", "maos"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Natural Language :: Portuguese (Brazilian)",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video :: Capture",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+
+# Versões fixadas para um build reproduzível. Para atualizar: suba a versão
+# aqui, rode `./setup.sh --reinstall` e confirme que o app ainda roda.
+dependencies = [
+    "opencv-python==5.0.0.93",
+    "mediapipe==0.10.35",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.6",
+    "black>=24.0",
+    "pre-commit>=3.5",
+]
+
+[project.urls]
+Repository = "https://github.com/WallaceCampista/ContadorDedos"
+
+[project.scripts]
+contador-dedos = "contador_dedos:main"
+
+[tool.setuptools]
+# Módulo único por enquanto; a Fase 3 o transforma no pacote `contador_dedos/`
+# sem que o entry point acima precise mudar.
+py-modules = ["contador_dedos"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+# ------------------------------------------------------------------------------
+# Qualidade
+# ------------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplificações
+    "UP",   # pyupgrade
+    "RUF",  # regras do próprio ruff
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Permite rodar os testes sem instalar o pacote.
+pythonpath = ["src", "tests"]
+addopts = "-q"

@@ -43,8 +43,15 @@ cd ContadorDedos
 Executando o app:
 
 ```bash
-.venv/bin/python src/main.py
-# ou: source .venv/bin/activate && python src/main.py
+.venv/bin/python src/contador_dedos.py
+# ou: source .venv/bin/activate && python src/contador_dedos.py
+```
+
+Para desenvolver, instale também as ferramentas de qualidade e ative os hooks:
+
+```bash
+.venv/bin/python -m pip install -e ".[dev]"
+.venv/bin/pre-commit install
 ```
 
 Se atualizar as dependências, rode `./setup.sh --reinstall`. O script é
@@ -55,10 +62,11 @@ idempotente — pode rodar quantas vezes quiser.
 
 ### Dependências
 
-As versões em [`requirements.txt`](./requirements.txt) são **fixadas** (`==`)
-para que o build seja reproduzível. Ao subir uma versão:
+As versões vivem no [`pyproject.toml`](./pyproject.toml) e são **fixadas**
+(`==`) para que o build seja reproduzível — o `requirements.txt` apenas aponta
+para lá (`-e .`), então há um único lugar para editar. Ao subir uma versão:
 
-1. Altere o pin no `requirements.txt`.
+1. Altere o pin em `[project].dependencies` no `pyproject.toml`.
 2. Rode `./setup.sh --reinstall`.
 3. **Confirme que o app abre a webcam e conta os dedos** antes de commitar.
 4. Explique no PR o motivo da atualização.
@@ -73,18 +81,26 @@ prioriza uma stack enxuta.
    git checkout -b feat/nome-curto-da-mudanca
    ```
 2. Faça suas alterações em commits pequenos e coesos.
-3. **Teste manualmente** com a webcam (o projeto ainda não tem testes
-   automatizados — chegam na Fase 2 do plano).
-4. Abra o **Pull Request** para `development`, preenchendo o template.
+3. **Rode os checks locais** — os mesmos que a CI executa:
+   ```bash
+   pytest && ruff check . && black --check .
+   ```
+   Com o `pre-commit install` feito, lint e formatação rodam sozinhos no commit.
+4. **Adicione testes** para a lógica nova. A regra é manter a lógica pura
+   separada da câmera, para que ela seja testável sem hardware — veja
+   `tests/helpers.py`, que monta mãos sintéticas.
+5. **Teste manualmente** com a webcam também: nenhum teste cobre o loop de vídeo.
+6. Abra o **Pull Request** para `development`, preenchendo o template.
 
 Prefixos de branch sugeridos: `feat/`, `fix/`, `docs/`, `refactor/`, `chore/`.
 
 ## Padrões de código
 
-Enquanto o lint automático não chega (Ruff + Black, Fase 2 do plano), siga o
-básico:
+**Ruff** e **Black** são a autoridade sobre estilo — rode-os antes de abrir o
+PR (ou deixe o `pre-commit` fazer isso). A configuração está no
+[`pyproject.toml`](./pyproject.toml). Além do que a ferramenta cobre:
 
-- **PEP 8**, indentação de 4 espaços, linhas de até ~100 caracteres.
+- Linhas de até **100 caracteres** (limite configurado em ambos).
 - **Nomes descritivos em português** para o domínio (`contador_dedos`,
   `mao_esquerda`) — mas **sem misturar** português e inglês na mesma abstração.
 - **Nada de números mágicos soltos:** dê nome aos índices de landmarks e limiares

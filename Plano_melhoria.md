@@ -404,7 +404,7 @@ O modo de face **só é aceitável** com estas garantias:
    A migração para `pyproject.toml` fica para a Fase 2, junto com o entry point.
 3. ✅ Adicionar `CONTRIBUTING.md` e templates `.github/` (bug, feature, PR).
 
-> **Próxima fase:** [Fase 2 — Qualidade e automação](#fase-2--qualidade-e-automação-p2).
+> **Próxima fase:** [Fase 3 — Arquitetura modular](#fase-3--arquitetura-modular-habilitadora).
 
 ### Fase 1 — Correção e refatoração do núcleo (P0 + P1) — ✅ **concluída**
 
@@ -446,12 +446,37 @@ vale com ou sem `cv2.flip` — o espelhamento muda apenas *a qual mão real* aqu
 rótulo corresponde (`real_hand()`). O esboço original desta seção invertia os
 sinais por assumir entrada não espelhada.
 
-### Fase 2 — Qualidade e automação (P2)
-1. `pyproject.toml` com metadados, dependências e entry point (`contador-dedos`).
-2. **Testes** com `pytest` sobre `count_fingers` (mãos sintéticas, sem câmera).
-3. **Ruff + Black** via `pyproject.toml`; **pre-commit** com os hooks.
-4. **CI (GitHub Actions):** matriz Python 3.9–3.12 rodando lint + testes.
-5. Badges no README (CI, licença, Python).
+### Fase 2 — Qualidade e automação (P2) — ✅ **concluída**
+
+1. ✅ `pyproject.toml` com metadados, dependências fixadas, extra `dev` e entry
+   point `contador-dedos`. O `requirements.txt` virou um ponteiro (`-e .`), de
+   modo que os pins têm **um único dono**.
+2. ✅ **78 testes** com `pytest`, em `tests/` — contagem e lateralidade
+   (`tests/helpers.py` monta mãos sintéticas), suavização, FPS, CLI, desenho e
+   integridade do download do modelo (com `urlopen` substituído). A suíte roda
+   **sem webcam, sem modelo e sem rede**.
+3. ✅ **Ruff + Black** configurados no `pyproject.toml` (linha de 100, alvo
+   `py39`, regras `E/W/F/I/B/C4/SIM/UP/RUF`) e `.pre-commit-config.yaml` com os
+   dois mais os hooks de higiene — incluindo `check-added-large-files`, que
+   impede commitar o modelo de 7,5 MB por acidente.
+4. ✅ **CI** em `.github/workflows/ci.yml`: matriz Python 3.9–3.12 rodando lint,
+   formatação e testes a cada push e PR.
+5. ✅ Badges no README (CI, Python, licença, Black, Ruff).
+
+> **Renomeação necessária.** `src/main.py` virou **`src/contador_dedos.py`**: um
+> entry point instalável exige um módulo importável, e `main` no topo do
+> `site-packages` colidiria com qualquer outro pacote. O caminho de execução
+> antigo continua valendo (`python src/contador_dedos.py`), e agora existe
+> também o comando `contador-dedos`. A Fase 3 transforma esse módulo no pacote
+> `contador_dedos/` — **sem que o entry point precise mudar**, bastando o
+> `__init__.py` reexportar `main`.
+
+O `pyupgrade` (regras `UP`) modernizou as anotações para `list[...]`, `dict[...]`
+e `X | None`. Isso é seguro no Python 3.9 porque o módulo usa
+`from __future__ import annotations` — as anotações nunca são avaliadas em tempo
+de execução. A contrapartida: `typing.get_type_hints()` sobre essas funções
+falharia no 3.9. Nada no projeto faz isso, mas vale saber antes de introduzir
+alguma ferramenta que inspecione tipos em runtime.
 
 ### Fase 3 — Arquitetura modular (habilitadora)
 Migrar para a estrutura de pacote da [Seção 3](#3-arquitetura-alvo): `Mode` (ABC),
@@ -508,10 +533,11 @@ garantias de privacidade. Entregar com testes da camada de `FaceDB` (match/delet
 
 1. ~~**Fase 0** (limpeza rápida): remover `.idea/`, fixar dependências.~~ ✅
 2. ~~**Refatorar `main.py`** conforme a Fase 1, corrigindo todos os P0 no mesmo PR.~~ ✅
-3. `count_fingers` já está extraído e puro — falta **escrever os testes** (Fase 2).
-4. Configurar **CI + lint** para proteger a base.
-   Atenção: o job precisa baixar o modelo (ou cacheá-lo); os testes da lógica
-   pura, porém, rodam sem modelo e sem câmera.
+3. ~~`count_fingers` já está extraído e puro — falta **escrever os testes** (Fase 2).~~ ✅
+4. ~~Configurar **CI + lint** para proteger a base.~~ ✅
+   A CI não precisa do modelo: os testes cobrem só lógica pura. Ela instala,
+   isso sim, `libgl1`/`libglib2.0-0` no runner — o wheel do `opencv-python`
+   (não-headless) linka libGL e o `import cv2` falharia sem elas.
 5. **Fase 3 (arquitetura modular)** — é a fundação; sem ela, menu e face viram gambiarra.
 6. **Fase 4 (menu clicável)** — entrega a experiência "escolha o que fazer".
 7. Só então **gestos (Fase 5)** e **face (Fase 6)**, uma feature por PR, cada uma como um `Mode` com testes.

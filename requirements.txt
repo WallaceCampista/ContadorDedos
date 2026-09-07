@@ -1,10 +1,7 @@
-# Dependências do Contador de Dedos — versões fixadas para build reproduzível.
+# O pyproject.toml é a fonte única das dependências fixadas.
+# Mantido para o fluxo do setup.sh e do README:
 #
-# Instalação (ver README / setup.sh):
 #   pip install --no-compile -r requirements.txt
 #
-# Para atualizar: suba a versão aqui, rode `./setup.sh --reinstall` e confirme
-# que o app ainda roda antes de commitar.
-
-opencv-python==5.0.0.93
-mediapipe==0.10.35
+# A flag --no-compile é necessária por causa do wheel do MediaPipe (ver README).
+-e .

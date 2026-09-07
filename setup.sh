@@ -100,8 +100,8 @@ trap 'echo; print_error "Setup interrompido (linha $LINENO). Corrija o problema 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-if [ ! -f "src/main.py" ]; then
-    print_error "Rode este script na raiz do projeto Contador de Dedos (src/main.py não encontrado)."
+if [ ! -f "src/contador_dedos.py" ]; then
+    print_error "Rode este script na raiz do projeto Contador de Dedos (src/contador_dedos.py não encontrado)."
     exit 1
 fi
 
@@ -187,7 +187,7 @@ progress_header "Modelo de detecção de mãos"
 
 # O MediaPipe 0.10.35 removeu a API legada `mp.solutions`; a Tasks API que a
 # substituiu precisa do arquivo de modelo, que não vem no wheel. O download (e a
-# verificação de integridade) mora no próprio src/main.py, para que a URL e o
+# verificação de integridade) mora no próprio src/contador_dedos.py, para que a URL
 # hash tenham um único dono — e para que rodar o app sem o setup.sh também
 # funcione.
 MODEL_FILE="models/hand_landmarker.task"
@@ -215,9 +215,10 @@ echo ""
 
 echo "Para executar (abre a webcam):"
 echo ""
-echo -e "  ${GREEN}${VENV_BIN}/python src/main.py${NC}"
+echo -e "  ${GREEN}${VENV_BIN}/python src/contador_dedos.py${NC}"
 echo ""
-print_info "Ative o ambiente com:  ${GREEN}source ${VENV_BIN}/activate${NC}  (depois: ${GREEN}python src/main.py${NC})"
+print_info "Ou use o comando instalado: ${GREEN}${VENV_BIN}/contador-dedos${NC}"
+print_info "Ative o ambiente com:  ${GREEN}source ${VENV_BIN}/activate${NC}  (depois: ${GREEN}python src/contador_dedos.py${NC})"
 if [ "$PLATFORM" = "macos" ]; then
     print_info "No macOS, autorize a câmera para o seu terminal em Ajustes > Privacidade e Segurança > Câmera."
 fi
