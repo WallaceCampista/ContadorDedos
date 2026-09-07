@@ -22,3 +22,10 @@ CLAUDE.local.md
 # Modelos do MediaPipe — baixados sob demanda, nunca versionados
 models/
 *.task
+
+# Dados biométricos e modelos — NUNCA versionar (LGPD, Art. 5º, II)
+faces/
+*.npz
+*.onnx
+*.tflite
+*.dat

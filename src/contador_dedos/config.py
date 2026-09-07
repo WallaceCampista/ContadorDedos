@@ -7,11 +7,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .vision.embedder import DEFAULT_THRESHOLD as DEFAULT_FACE_THRESHOLD
+
 #: Onde o modelo fica em disco (gitignorado — ver `.gitignore`).
 #: `parents[2]` sobe de `src/contador_dedos/config.py` até a raiz do repositório;
 #: o projeto é instalado em modo editável, então esse caminho vale também para o
 #: comando `contador-dedos`.
-DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "models" / "hand_landmarker.task"
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_MODEL_PATH = _PROJECT_ROOT / "models" / "hand_landmarker.task"
+#: Base de rostos: local, fora do versionamento, com acesso restrito ao usuário.
+DEFAULT_FACES_DB = _PROJECT_ROOT / "faces" / "faces.npz"
 
 
 @dataclass(frozen=True)
@@ -25,6 +30,13 @@ class AppConfig:
     mirror: bool = True
     smooth_window: int = 5
     model_path: Path = DEFAULT_MODEL_PATH
+    faces_db: Path = DEFAULT_FACES_DB
+    face_threshold: float = DEFAULT_FACE_THRESHOLD
+
+    @property
+    def models_dir(self) -> Path:
+        """Onde ficam todos os modelos baixados."""
+        return self.model_path.parent
 
 
 def parse_args(argv: Sequence[str] | None = None) -> AppConfig:
@@ -76,6 +88,21 @@ def parse_args(argv: Sequence[str] | None = None) -> AppConfig:
         metavar="ARQUIVO",
         help="caminho do hand_landmarker.task (baixado se faltar)",
     )
+    parser.add_argument(
+        "--faces-db",
+        type=Path,
+        default=defaults.faces_db,
+        metavar="ARQUIVO",
+        help="base local de rostos cadastrados (padrão: %(default)s)",
+    )
+    parser.add_argument(
+        "--face-threshold",
+        type=float,
+        default=defaults.face_threshold,
+        metavar="F",
+        help="distância máxima para reconhecer um rosto; menor = mais rigor "
+        "(padrão: %(default)s)",
+    )
     mirror = parser.add_mutually_exclusive_group()
     mirror.add_argument(
         "--mirror",
@@ -98,6 +125,8 @@ def parse_args(argv: Sequence[str] | None = None) -> AppConfig:
         parser.error("--max-hands precisa ser >= 1.")
     if args.smooth_window < 1:
         parser.error("--smooth-window precisa ser >= 1.")
+    if not 0.0 < args.face_threshold <= 2.0:
+        parser.error("--face-threshold precisa estar entre 0 (exclusivo) e 2.")
     for name, value in (
         ("--detection-confidence", args.detection_confidence),
         ("--tracking-confidence", args.tracking_confidence),
@@ -113,4 +142,6 @@ def parse_args(argv: Sequence[str] | None = None) -> AppConfig:
         mirror=args.mirror,
         smooth_window=args.smooth_window,
         model_path=args.model,
+        faces_db=args.faces_db,
+        face_threshold=args.face_threshold,
     )

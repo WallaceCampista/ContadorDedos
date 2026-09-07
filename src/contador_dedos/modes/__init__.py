@@ -13,6 +13,7 @@ from typing import Callable
 
 from ..vision.hands import HandTracker
 from .base import Mode
+from .face_id import FaceId
 from .finger_counter import FingerCounter
 from .gesture import GestureRecognizer
 from .libras import LibrasNumbers
@@ -25,6 +26,7 @@ MODE_FACTORIES: tuple[ModeFactory, ...] = (
     FingerCounter.from_config,
     GestureRecognizer.from_config,
     LibrasNumbers.from_config,
+    FaceId.from_config,
 )
 
 
@@ -62,6 +64,7 @@ def close_modes(modes: Sequence[Mode]) -> None:
 
 __all__ = [
     "MODE_FACTORIES",
+    "FaceId",
     "FingerCounter",
     "GestureRecognizer",
     "LibrasNumbers",

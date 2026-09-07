@@ -10,6 +10,7 @@ import hashlib
 import os
 import urllib.error
 import urllib.request
+import zipfile
 from pathlib import Path
 
 
@@ -72,4 +73,48 @@ def ensure_model(path: Path, url: str, sha256: str, allow_download: bool = True)
     if not allow_download:
         raise ModelError(f"Modelo não encontrado em {path}.")
     download_model(path, url, sha256)
+    return path
+
+
+def ensure_model_from_archive(
+    path: Path,
+    url: str,
+    archive_sha256: str,
+    member: str,
+    sha256: str,
+    allow_download: bool = True,
+) -> Path:
+    """Extrai um modelo de dentro de um ``.zip`` publicado, e só guarda o modelo.
+
+    O ArcFace é distribuído em um pacote com vários modelos, dos quais usamos um.
+    Baixamos o pacote uma vez, tiramos o arquivo que interessa e descartamos o
+    resto — ficam ~14 MB em disco, não os ~122 MB do pacote.
+    """
+    if path.is_file():
+        return path
+    if not allow_download:
+        raise ModelError(f"Modelo não encontrado em {path}.")
+
+    archive = path.with_suffix(".archive.zip")
+    download_model(archive, url, archive_sha256)
+    try:
+        with zipfile.ZipFile(archive) as bundle:
+            try:
+                data = bundle.read(member)
+            except KeyError as error:
+                raise ModelError(f"O pacote baixado não contém {member}.") from error
+    except zipfile.BadZipFile as error:
+        raise ModelError(f"O pacote baixado em {archive} não é um zip válido.") from error
+    finally:
+        archive.unlink(missing_ok=True)
+
+    actual = hashlib.sha256(data).hexdigest()
+    if actual != sha256:
+        raise ModelError(
+            f"O modelo {member} não confere com o hash esperado "
+            f"(esperado {sha256}, obtido {actual})."
+        )
+    partial = path.with_suffix(path.suffix + ".part")
+    partial.write_bytes(data)
+    os.replace(partial, path)
     return path

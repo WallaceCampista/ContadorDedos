@@ -94,6 +94,13 @@ prioriza uma stack enxuta.
    `src/contador_dedos/modes/` e registre a fábrica em `modes/__init__.py`. O
    loop principal não precisa mudar — e o card no menu, com atalho de teclado,
    aparece sozinho a partir do `name` do modo.
+
+   > **Ao mexer no modo Rosto (ID):** dado biométrico facial é dado pessoal
+   > sensível (LGPD, Art. 5º, II). As garantias listadas no README — consentimento
+   > antes do cadastro, armazenamento só local, embeddings em vez de fotos,
+   > permissão `0600` e exclusão sob demanda — são **requisito**, não sugestão.
+   > Cada uma tem teste; se um PR precisar afrouxar alguma, explique o porquê na
+   > descrição. E nunca commite `faces/` nem modelos.
 5. **Teste manualmente** com a webcam também: nenhum teste cobre o loop de vídeo.
 6. Abra o **Pull Request** para `development`, preenchendo o template.
 

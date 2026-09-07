@@ -24,6 +24,14 @@ class Mode(ABC):
     def process(self, frame):
         """Recebe um frame BGR e devolve o frame anotado."""
 
+    def on_key(self, key: int) -> bool:
+        """Teclas do modo (opcional).
+
+        Devolva ``True`` para dizer que a tecla foi consumida — é assim que um
+        campo de texto impede que digitar "q" encerre o app.
+        """
+        return False
+
     def on_mouse(self, event: int, x: int, y: int) -> None:  # noqa: B027
         """Cliques dentro do modo (opcional) — só o menu da Fase 4 depende disto."""
 

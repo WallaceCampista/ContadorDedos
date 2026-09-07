@@ -108,6 +108,10 @@ class App:
     # -- entrada ------------------------------------------------------------
 
     def handle_key(self, key: int) -> None:
+        # A tela corrente tem a primeira chance: um campo de texto precisa
+        # receber o "q" como letra, e não como "encerrar o app".
+        if self.screen.on_key(key):
+            return
         if should_quit(key):
             self.running = False
         elif key == KEY_BACK:

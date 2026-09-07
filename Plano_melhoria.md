@@ -404,7 +404,7 @@ O modo de face **só é aceitável** com estas garantias:
    A migração para `pyproject.toml` fica para a Fase 2, junto com o entry point.
 3. ✅ Adicionar `CONTRIBUTING.md` e templates `.github/` (bug, feature, PR).
 
-> **Próxima fase:** [Fase 6 — Identificação por Face](#fase-6--identificação-por-face--lgpd).
+> **Próxima fase:** [Fase 7 — Extras](#fase-7--extras).
 
 ### Fase 1 — Correção e refatoração do núcleo (P0 + P1) — ✅ **concluída**
 
@@ -631,10 +631,62 @@ O que separa o modo Libras do *Contar Dedos* é *quais* dedos estão estendidos,
 não quantos — três dedos quaisquer somam 3, mas só polegar+indicador+médio é o
 numeral 3. Há teste ancorando exatamente essa distinção.
 
-### Fase 6 — Identificação por Face (+ LGPD)
-Implementar o modo **"Rosto (ID)"** ([Seção 5](#5-nova-funcionalidade-identificação-por-face)):
-detecção, embedding, base local, fluxo de cadastro, tela de consentimento e
-garantias de privacidade. Entregar com testes da camada de `FaceDB` (match/delete).
+### Fase 6 — Identificação por Face (+ LGPD) — ✅ **concluída**
+
+O modo **"Rosto (ID)"** entrou como o quarto card do menu, com o pipeline da
+[Seção 5.1](#51-pipeline) inteiro: detecção → alinhamento → embedding →
+comparação com a base → caixa com o nome ou "Desconhecido".
+
+```
+src/contador_dedos/
+├── vision/
+│   ├── faces.py      # FaceTracker (BlazeFace) + alinhamento para o ArcFace
+│   └── embedder.py   # protocolo Embedder + ArcFaceEmbedder (onnxruntime)
+├── storage/
+│   └── faces_db.py   # FaceDB: add / match / delete / names, .npz + índice JSON
+└── modes/
+    └── face_id.py    # as 5 telas: reconhecer, consentir, nomear, capturar, gerenciar
+```
+
+**As garantias da [Seção 5.5](#55-privacidade-e-lgpd-requisito-não-opcional), todas com teste:**
+- ✅ **Consentimento explícito** — não há caminho para o cadastro que não passe
+  pela tela de aviso (`test_cadastrar_passa_obrigatoriamente_pelo_consentimento`).
+- ✅ **Somente local** — a camada de armazenamento não tem nenhuma chamada de rede.
+- ✅ **Minimização** — grava embeddings, nunca imagens.
+- ✅ **Acesso restrito** — arquivos em `0600`, verificado em teste.
+- ✅ **Direito ao esquecimento** — `FaceDB.delete` e o botão *Excluir* por pessoa.
+- ✅ **Fora do versionamento** — `faces/`, `*.npz`, `*.onnx`, `*.tflite`, `*.dat`.
+- ✅ **Transparência** — seção *Privacidade e LGPD* no README, e um índice
+  `faces.json` legível que lista os nomes cadastrados sem expor vetor algum.
+
+**Testes:** 310 (eram 247). Cobrem `FaceDB` (match/delete/persistência/permissão/
+base corrompida), a máquina de estados do modo com dublês de detector e embedder,
+o alinhamento, e a extração do modelo de dentro do pacote zip.
+
+> **Embedder: ArcFace via onnxruntime, não dlib.** A Seção 5.4 sugeria
+> `face_recognition` para o MVP, com a ressalva sobre o build do `dlib` — e a
+> ressalva se confirmou: **não há wheel** para este Python/arquitetura, o `dlib`
+> compilaria do zero e a CI repetiria isso na matriz inteira. Fomos para o
+> fallback que a própria seção previa: **ArcFace (MobileFaceNet 512-d)** sobre
+> `onnxruntime`, que tem wheel pronto. A detecção usa o **MediaPipe Face
+> Detector**, como a seção recomenda, mantendo a coerência com o resto da stack.
+
+> **Carga tardia.** O detector e o ArcFace são criados **na primeira vez que o
+> modo é aberto**, não no início do app: quem nunca entra no modo não paga o
+> download de ~122 MB. O modo mostra o aviso um frame *antes* de bloquear —
+> senão a janela congelaria sem explicação.
+
+> **Números medidos.** Na foto de teste, a mesma pessoa com brilho alterado e
+> rotação de 8° fica a **0,071** de distância; ruído aleatório fica a **1,068**.
+> O limiar padrão de **0,62** separa os dois com folga larga, e é ajustável por
+> `--face-threshold`. Esses números estão fixados em
+> `tests/test_face_integration.py`, que é **pulado** quando os modelos não estão
+> em disco — a CI nunca baixa 122 MB.
+
+**Uma extensão no contrato `Mode`:** o cadastro precisa que o usuário digite um
+nome, então `Mode.on_key(key) -> bool` foi acrescentado. A tela corrente tem a
+primeira chance na tecla; devolver `True` significa "consumi" — é isso que
+impede que digitar "q" em um campo de texto encerre o app.
 
 ### Fase 7 — Extras
 - **Feedback sonoro** ao mudar a contagem/reconhecer alguém (opcional).
@@ -681,9 +733,8 @@ garantias de privacidade. Entregar com testes da camada de `FaceDB` (match/delet
    A aposta da Fase 3 se confirmou: o menu saiu sem tocar no loop, e um modo
    novo agora custa uma classe e uma linha no registro.
 7. ~~Só então **gestos (Fase 5)** e **face (Fase 6)**, uma feature por PR, cada uma como um `Mode` com testes.~~
-   Gestos e Libras (1–5) entregues na Fase 5. Restam: **face (Fase 6)** e o
-   complemento de **Libras 0 e 6–10**, que depende de referência de
-   configurações e de análise temporal.
+   Gestos, Libras (1–5) e rosto entregues. Resta o complemento de **Libras 0 e
+   6–10**, que depende de referência de configurações e de análise temporal.
 
 > **Princípios:** (1) estabilizar e testar o núcleo antes de expandir;
 > (2) a arquitetura modular vem **antes** das features novas — é o que as torna

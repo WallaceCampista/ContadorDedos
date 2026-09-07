@@ -9,5 +9,5 @@ from __future__ import annotations
 from .app import App, main
 from .config import AppConfig
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = ["App", "AppConfig", "__version__", "main"]

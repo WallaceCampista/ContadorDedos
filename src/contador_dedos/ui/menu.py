@@ -120,6 +120,10 @@ class Menu:
         if event == cv2.EVENT_LBUTTONDOWN and self.hovered is not None:
             self._selection = self.entries[self.hovered].key
 
+    def on_key(self, key: int) -> bool:
+        """O menu não consome teclas: o `App` trata os atalhos dos cards."""
+        return False
+
     def close(self) -> None:
         """O menu não segura recurso nenhum."""
 

@@ -9,6 +9,7 @@ import pytest
 from contador_dedos.app import KEY_BACK, App, build_menu, should_quit
 from contador_dedos.config import AppConfig
 from contador_dedos.modes import MODE_FACTORIES, Mode, build_modes, close_modes
+from contador_dedos.modes.face_id import FaceId
 from contador_dedos.modes.finger_counter import FingerCounter
 from contador_dedos.modes.gesture import GestureRecognizer
 from contador_dedos.modes.libras import LibrasNumbers
@@ -124,9 +125,9 @@ def test_modos_registrados_nao_fecham_o_detector_compartilhado(modo):
 
 
 def test_registro_traz_os_modos_de_visao():
-    assert len(MODE_FACTORIES) == 3
-    nomes = {FingerCounter.name, GestureRecognizer.name, LibrasNumbers.name}
-    assert nomes == {"Contar Dedos", "Gestos", "Libras"}
+    assert len(MODE_FACTORIES) == 4
+    nomes = {FingerCounter.name, GestureRecognizer.name, LibrasNumbers.name, FaceId.name}
+    assert nomes == {"Contar Dedos", "Gestos", "Libras", "Rosto (ID)"}
 
 
 def test_close_modes_fecha_todos():

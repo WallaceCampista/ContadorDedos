@@ -13,12 +13,14 @@
   - [Detecção de Mãos](#detecao-de-maos)
   - [Reconhecimento de gestos](#reconhecimento-de-gestos)
   - [Números em Libras](#numeros-em-libras)
+  - [Identificação por rosto](#identificacao-por-rosto)
   - [Contagem de Dedos](#contagem-de-dedos)
   - [Visualização em Tempo Real](#visualizacao-em-tempo-real)
 - [Tecnologias Utilizadas](#tecnologias-utilizadas)
 - [Pré-requisitos](#pre-requisitos)
 - [Como Configurar e Executar](#como-configurar-e-executar)
   - [Opções de linha de comando](#opcoes-de-linha-de-comando)
+- [Privacidade e LGPD](#privacidade-e-lgpd)
 - [Qualidade: testes e lint](#qualidade-testes-e-lint)
 - [Arquitetura do Projeto](#arquitetura-do-projeto)
 - [Contribuição](#contribuicao)
@@ -49,10 +51,10 @@ registrados, então cada funcionalidade nova ganha o seu card automaticamente.
 │  │      1       │ │    2     │ │    3     │    │
 │  │ Contar Dedos │ │  Gestos  │ │  Libras  │    │
 │  └──────────────┘ └──────────┘ └──────────┘    │
-│                  ┌──────────┐                   │
-│                  │    Q     │                   │
-│                  │   Sair   │                   │
-│                  └──────────┘                   │
+│       ┌──────────────┐ ┌──────────┐             │
+│       │      4       │ │    Q     │             │
+│       │  Rosto (ID)  │ │   Sair   │             │
+│       └──────────────┘ └──────────┘             │
 │                                                  │
 │     Clique em um card  •  Q encerra    29.9 FPS  │
 └──────────────────────────────────────────────────┘
@@ -114,6 +116,24 @@ o numeral **3** em Libras.
 | **4** | Indicador + médio + anelar + mínimo (sem o polegar) |
 | **5** | Os cinco dedos |
 
+<h3 id="identificacao-por-rosto">Identificação por rosto</h3>
+
+O modo **Rosto (ID)** detecta rostos, compara com uma base **local** de pessoas
+cadastradas e mostra o nome de quem reconheceu — ou `Desconhecido`.
+
+O cadastro passa obrigatoriamente por uma **tela de consentimento** que explica
+o que é guardado, onde e como excluir. Depois vêm o nome e a captura de 12
+quadros, cuja média vira o vetor salvo. O botão **Gerenciar** lista quem está
+cadastrado e permite **excluir** a qualquer momento.
+
+> **Primeira abertura baixa ~122 MB.** O detector de rosto (224 KB) e o modelo
+> ArcFace vêm sob demanda, só quando você entra neste modo — quem não usa não
+> paga o download. O pacote do ArcFace é descartado depois da extração; ficam
+> ~14 MB em disco.
+
+Se o reconhecimento errar, ajuste `--face-threshold`: **menor = mais rigor**
+(mais `Desconhecido`, menos confusão entre pessoas parecidas).
+
 ### Contagem de Dedos:
 Conta o número de dedos estendidos para cada mão (esquerda e direita) e exibe o total.
 O código verifica a posição da ponta de cada dedo (pontos 8, 12, 16 e 20) em relação à sua articulação PIP (pontos 6, 10, 14 e 18, respectivamente).
@@ -140,6 +160,8 @@ qualquer webcam.
 - Python: Linguagem de programação principal.
 
 - OpenCV: Biblioteca de visão computacional usada para capturar o vídeo da webcam e exibir os resultados.
+
+- ONNX Runtime: Executa o modelo ArcFace do reconhecimento facial.
 
 - MediaPipe (Tasks API): Estrutura de aprendizado de máquina para detecção e rastreamento de mãos, via `HandLandmarker`.
 
@@ -188,8 +210,8 @@ python -m contador_dedos
 ```
 
 A janela da sua webcam abre no **menu**; clique em *Contar Dedos* (ou aperte `1`)
-ou em *Gestos* (`2`) ou *Libras* (`3`) para começar. **ESC** volta ao menu e
-**Q** encerra.
+ou em *Gestos* (`2`), *Libras* (`3`) ou *Rosto (ID)* (`4`) para começar.
+**ESC** volta ao menu e **Q** encerra.
 
 > Se o modelo `hand_landmarker.task` ainda não estiver em `models/`, ele é baixado automaticamente nesta primeira execução.
 
@@ -207,7 +229,9 @@ Todos os parâmetros têm um padrão sensato — rodar sem argumentos funciona. 
 | `--tracking-confidence F` | `0.5` | Confiança mínima para manter o rastreamento entre frames (0 a 1). |
 | `--smooth-window N` | `5` | Frames usados na suavização anti-flicker da contagem. |
 | `--mirror` / `--no-mirror` | `--mirror` | Espelha (ou não) a imagem da câmera. |
-| `--model ARQUIVO` | `models/hand_landmarker.task` | Caminho do modelo; baixado se estiver faltando. |
+| `--model ARQUIVO` | `models/hand_landmarker.task` | Caminho do modelo de mãos; baixado se estiver faltando. |
+| `--faces-db ARQUIVO` | `faces/faces.npz` | Base local de rostos cadastrados. |
+| `--face-threshold F` | `0.62` | Distância máxima para reconhecer um rosto; menor = mais rigor. |
 
 ```bash
 # Segunda câmera, uma mão só e sem espelhamento
@@ -216,6 +240,26 @@ Todos os parâmetros têm um padrão sensato — rodar sem argumentos funciona. 
 
 > O `setup.sh` instala o projeto em modo editável, então o comando
 > **`.venv/bin/contador-dedos`** também funciona — com as mesmas opções.
+
+<br>
+
+## Privacidade e LGPD
+
+Dados biométricos faciais são **dados pessoais sensíveis** (LGPD, Art. 5º, II).
+O modo de rosto foi construído com essas garantias, e elas não são opcionais:
+
+| Garantia | Como é cumprida |
+|---|---|
+| **Consentimento explícito** | O cadastro só começa depois de uma tela que explica o quê, o onde e o como excluir — sem atalho para pulá-la. |
+| **Somente local** | A base fica em `faces/faces.npz` na sua máquina. Não há nenhuma chamada de rede na camada de armazenamento. |
+| **Minimização** | Guardamos **embeddings** (vetores numéricos), nunca as fotos. O vetor serve para comparar, mas não reconstrói a sua imagem. |
+| **Acesso restrito** | Os arquivos são gravados com permissão `0600` — só o seu usuário lê. |
+| **Direito ao esquecimento** | Botão **Excluir** por pessoa, em *Gerenciar*. A remoção é imediata e persiste em disco. |
+| **Fora do versionamento** | `faces/`, `*.npz`, `*.onnx` e `*.tflite` estão no `.gitignore`. Nenhum dado biométrico entra no repositório. |
+
+Um índice legível em `faces/faces.json` lista **quem** está cadastrado (sem
+expor vetor nenhum), para você auditar o conteúdo da base a qualquer momento.
+Para apagar tudo de uma vez, basta remover a pasta `faces/`.
 
 <br>
 
@@ -268,8 +312,10 @@ como um módulo plugável em vez de engordar um script único:
   vídeo e a anotação do frame.
 - **`ui/`** — o tema (paleta e métricas), as primitivas de desenho (cards,
   painéis, botões) e o menu. Trocar a HighGUI por PySide6 mexeria só aqui.
-- **`vision/`** — a única camada que conhece o MediaPipe, mais a leitura
-  geométrica da mão (`handshape.py`) que contagem e gestos compartilham.
+- **`vision/`** — a única camada que conhece o MediaPipe e o ArcFace, mais a
+  leitura geométrica da mão (`handshape.py`) que contagem e gestos compartilham.
+- **`storage/`** — a base local de rostos. Nenhuma chamada de rede aqui, por
+  construção.
 - **`modes/`** — cada feature é um `Mode` (contagem, gestos e Libras hoje;
   rosto adiante). Adicionar uma = criar a classe e registrá-la. Todos
   compartilham **um único** detector de mãos, criado uma vez.
@@ -289,7 +335,8 @@ A estrutura de arquivos:
 │   ├── config.py         # AppConfig (dataclass) + CLI
 │   ├── core/             # câmera, relógio do vídeo e anotação do frame
 │   ├── ui/               # tema, primitivas de desenho e a tela de menu
-│   ├── vision/           # tudo que fala com o MediaPipe (+ download do modelo)
+│   ├── vision/           # MediaPipe, ArcFace e o download dos modelos
+│   ├── storage/          # base local de rostos (nunca versionada)
 │   └── modes/            # features plugáveis: base.py (ABC) + um arquivo por modo
 ├── tests/                # suíte pytest (sem webcam, sem modelo, sem rede)
 ├── pyproject.toml        # metadados, dependências, entry point e config das ferramentas
