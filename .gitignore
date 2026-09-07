@@ -18,3 +18,7 @@ CLAUDE.md
 CLAUDE.local.md
 .claude.json
 .mcp.json
+
+# Modelos do MediaPipe — baixados sob demanda, nunca versionados
+models/
+*.task

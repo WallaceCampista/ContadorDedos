@@ -404,32 +404,47 @@ O modo de face **só é aceitável** com estas garantias:
    A migração para `pyproject.toml` fica para a Fase 2, junto com o entry point.
 3. ✅ Adicionar `CONTRIBUTING.md` e templates `.github/` (bug, feature, PR).
 
-> **Próxima fase:** [Fase 1 — Correção e refatoração do núcleo](#fase-1--correção-e-refatoração-do-núcleo-p0--p1).
+> **Próxima fase:** [Fase 2 — Qualidade e automação](#fase-2--qualidade-e-automação-p2).
 
-### Fase 1 — Correção e refatoração do núcleo (P0 + P1)
-Reescrever `main.py` em funções, isolando a **lógica de contagem** (pura) da
-**captura/renderização** (I/O). Esboço:
+### Fase 1 — Correção e refatoração do núcleo (P0 + P1) — ✅ **concluída**
 
-```python
-# vision/landmarks.py — fim dos números mágicos
-TIP_IDS = (8, 12, 16, 20)          # pontas: indicador, médio, anelar, mínimo
-THUMB_TIP, THUMB_IP = 4, 3
+`src/main.py` foi reescrito em funções, isolando a **lógica de contagem** (pura,
+testável sem webcam) da **captura/renderização** (I/O).
 
-# modes/finger_counter.py — lógica pura, testável sem webcam
-def count_fingers(landmarks: list[tuple[int, int]], handedness: str) -> int:
-    count = 0
-    if handedness == "Right":
-        count += landmarks[THUMB_TIP][0] < landmarks[THUMB_IP][0]
-    else:
-        count += landmarks[THUMB_TIP][0] > landmarks[THUMB_IP][0]
-    for tip in TIP_IDS:
-        count += landmarks[tip][1] < landmarks[tip - 2][1]
-    return count
-```
+**P0 corrigidos:**
+1. ✅ Frame validado (`check`/`None`) antes de qualquer uso, com tolerância de 30 falhas seguidas.
+2. ✅ Câmera validada com `isOpened()` e mensagem de erro acionável.
+3. ✅ `open_camera` é um *context manager*; `destroyAllWindows` em `finally`.
+4. ✅ **Q** ou **ESC** encerram; o fechamento da janela pelo botão do sistema também.
+5. ✅ Rótulos e valores realinhados — cada painel fica do lado em que aquela mão aparece.
+6. ✅ `cv2.flip` ligado por padrão (`--no-mirror` desliga).
+7. ✅ Lateralidade vinda do classificador do MediaPipe, não mais da heurística geométrica.
 
-Entregas: corrigir **P0 #1–#7**, usar `multi_handedness`, suavizar a contagem
-(anti-flicker), CLI com `argparse` (`--camera`, `--max-hands`, `--mirror`),
-FPS na tela. *(Esta fase já prepara o terreno da estrutura de pacote da Fase 3.)*
+**P1 endereçados:** funções + `main()`/`__main__`, constantes nomeadas no lugar
+dos números mágicos, type hints e docstrings, `AppConfig` (dataclass) no lugar
+da configuração hardcoded, CLI com `argparse`, medidor de FPS e suavização
+anti-flicker (`CountSmoother`). O HUD escala com a resolução e os textos têm
+contorno, para continuarem legíveis em webcams 1080p e fundos claros.
+
+> **⚠️ Mudança de API descoberta nesta fase.** A pinagem da Fase 0
+> (`mediapipe==0.10.35`) **removeu a API legada `mp.solutions`**, que o código
+> original usava — o app não rodava com as dependências fixadas. A camada de
+> visão foi migrada para a **Tasks API** (`HandLandmarker`, modo `VIDEO`), que
+> exige o modelo `hand_landmarker.task` (~7,5 MB). O download, com verificação
+> de integridade (SHA-256) e escrita atômica, vive em `src/main.py` e é
+> reaproveitado pelo `setup.sh` (nova etapa 4/4); o modelo fica em `models/`,
+> **fora do versionamento**.
+>
+> Isso antecipa parte da Seção 3: `models/` já é o embrião de `storage/models/`.
+> **As Fases 5 e 6 herdam a decisão** — gestos e face também passam a usar a
+> Tasks API (`GestureRecognizer`, `FaceDetector`, `FaceLandmarker`), o que
+> *reforça* a recomendação da Seção 5.4 de manter a detecção no MediaPipe.
+
+Uma nota sobre a regra do polegar: o rótulo do MediaPipe e a geometria da imagem
+seguem a **mesma** convenção de espelhamento, então `"Right" → tip.x > ip.x`
+vale com ou sem `cv2.flip` — o espelhamento muda apenas *a qual mão real* aquele
+rótulo corresponde (`real_hand()`). O esboço original desta seção invertia os
+sinais por assumir entrada não espelhada.
 
 ### Fase 2 — Qualidade e automação (P2)
 1. `pyproject.toml` com metadados, dependências e entry point (`contador-dedos`).
@@ -491,10 +506,12 @@ garantias de privacidade. Entregar com testes da camada de `FaceDB` (match/delet
 
 ## 8. Próximos passos imediatos
 
-1. **Fase 0** (limpeza rápida): remover `.idea/`, fixar dependências.
-2. **Refatorar `main.py`** conforme a Fase 1, corrigindo todos os P0 no mesmo PR.
-3. Extrair `count_fingers` e **escrever os primeiros testes**.
+1. ~~**Fase 0** (limpeza rápida): remover `.idea/`, fixar dependências.~~ ✅
+2. ~~**Refatorar `main.py`** conforme a Fase 1, corrigindo todos os P0 no mesmo PR.~~ ✅
+3. `count_fingers` já está extraído e puro — falta **escrever os testes** (Fase 2).
 4. Configurar **CI + lint** para proteger a base.
+   Atenção: o job precisa baixar o modelo (ou cacheá-lo); os testes da lógica
+   pura, porém, rodam sem modelo e sem câmera.
 5. **Fase 3 (arquitetura modular)** — é a fundação; sem ela, menu e face viram gambiarra.
 6. **Fase 4 (menu clicável)** — entrega a experiência "escolha o que fazer".
 7. Só então **gestos (Fase 5)** e **face (Fase 6)**, uma feature por PR, cada uma como um `Mode` com testes.

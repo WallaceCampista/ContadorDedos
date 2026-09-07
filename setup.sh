@@ -68,7 +68,7 @@ print_header() {
 # ------------------------------------------------------------------------------
 BAR_WIDTH=30
 STEP=0
-TOTAL_STEPS=3   # Python, ambiente virtual, dependências
+TOTAL_STEPS=4   # Python, ambiente virtual, dependências, modelo
 
 draw_bar() { # $1 = porcentagem (0-100)
     local pct="$1" filled i out=""
@@ -178,6 +178,28 @@ else
         print_info "Dica: o MediaPipe só tem wheels para Python 3.9–3.12."
         exit 1
     fi
+fi
+
+# ==============================================================================
+# 4. Modelo de detecção de mãos (hand_landmarker.task)
+# ==============================================================================
+progress_header "Modelo de detecção de mãos"
+
+# O MediaPipe 0.10.35 removeu a API legada `mp.solutions`; a Tasks API que a
+# substituiu precisa do arquivo de modelo, que não vem no wheel. O download (e a
+# verificação de integridade) mora no próprio src/main.py, para que a URL e o
+# hash tenham um único dono — e para que rodar o app sem o setup.sh também
+# funcione.
+MODEL_FILE="models/hand_landmarker.task"
+
+if [ -f "$MODEL_FILE" ]; then
+    print_success "Modelo já baixado ($MODEL_FILE)"
+elif "$VENV_PY" -c "import sys; sys.path.insert(0, 'src'); import main; main.ensure_model(main.DEFAULT_MODEL_PATH)"; then
+    print_success "Modelo baixado em $MODEL_FILE"
+else
+    print_error "Falha ao baixar o modelo de detecção de mãos."
+    print_info "Verifique sua conexão e rode o setup novamente — o app também baixa o modelo na 1ª execução."
+    exit 1
 fi
 
 # ==============================================================================

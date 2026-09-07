@@ -9,6 +9,7 @@
 - [Tecnologias Utilizadas](#tecnologias-utilizadas)
 - [Pré-requisitos](#pre-requisitos)
 - [Como Configurar e Executar](#como-configurar-e-executar)
+  - [Opções de linha de comando](#opcoes-de-linha-de-comando)
 - [Arquitetura do Projeto](#arquitetura-do-projeto)
 - [Contribuição](#contribuicao)
 - [Licença](#licenca)
@@ -26,14 +27,19 @@ Identifica a presença de uma ou duas mãos no quadro da webcam.
 
 ### Contagem de Dedos: 
 Conta o número de dedos estendidos para cada mão (esquerda e direita) e exibe o total.
-O código verifica a posição do topo de cada dedo (pontos 8, 12, 16 e 20) em relação à sua base (pontos 6, 10, 14 e 18, respectivamente). 
-Se a ponta do dedo estiver acima da base, ele é considerado levantado. 
-O polegar (ponto 4) é tratado de forma diferente, comparando sua posição horizontal.
+O código verifica a posição da ponta de cada dedo (pontos 8, 12, 16 e 20) em relação à sua articulação PIP (pontos 6, 10, 14 e 18, respectivamente). 
+Se a ponta estiver acima da articulação, o dedo é considerado levantado. 
+O polegar (ponto 4) é tratado de forma diferente, comparando sua posição horizontal — por isso depende de saber qual é a mão.
+
+A **lateralidade** vem do classificador do próprio MediaPipe, e não de uma heurística geométrica: o rótulo continua correto mesmo com a mão girada ou de costas.
+A contagem também passa por uma **suavização anti-flicker** (o valor mais frequente dos últimos frames), para o número não tremer entre um quadro e outro.
 
 ### Visualização em Tempo Real: 
 Desenha os pontos de referência (landmarks) das mãos e exibe os contadores na tela.
-Os contadores de dedos para a mão esquerda, direita e o total são exibidos na tela da webcam em tempo real. 
-Os pontos de referência das mãos também são desenhados para uma visualização clara.
+Os contadores de dedos para a mão esquerda, direita e o total são exibidos na tela da webcam em tempo real, junto de um **medidor de FPS** e da dica de atalhos no rodapé.
+
+A imagem é **espelhada** por padrão, como um espelho de verdade: sua mão direita aparece à direita da tela, e cada contador fica do lado em que aquela mão realmente aparece.
+Os textos têm contorno escuro e escalam com a resolução da câmera, para permanecerem legíveis em qualquer fundo e em qualquer webcam.
 
 <br>
 
@@ -42,15 +48,18 @@ Os pontos de referência das mãos também são desenhados para uma visualizaç�
 
 - OpenCV: Biblioteca de visão computacional usada para capturar o vídeo da webcam e exibir os resultados.
 
-- MediaPipe: Estrutura de aprendizado de máquina para detecção e rastreamento de mãos.
+- MediaPipe (Tasks API): Estrutura de aprendizado de máquina para detecção e rastreamento de mãos, via `HandLandmarker`.
+
+> A partir do MediaPipe 0.10.35 a API legada `mp.solutions` foi removida. O projeto usa a **Tasks API**, que depende do modelo `hand_landmarker.task` (~7,5 MB) — baixado automaticamente pelo `setup.sh` ou na primeira execução, e mantido fora do versionamento.
 
 <br>
 
 ## Pré-requisitos
 - **Python 3.9 a 3.12** (faixa suportada pelo MediaPipe)
 - Uma **webcam**
+- **Conexão com a internet** na primeira execução (para baixar o modelo de detecção)
 
-As dependências (OpenCV + MediaPipe) são instaladas automaticamente pelo `setup.sh`.
+As dependências (OpenCV + MediaPipe) e o modelo de detecção são obtidos automaticamente pelo `setup.sh`.
 
 <br>
 
@@ -69,7 +78,7 @@ cd ContadorDedos
 Acompanhe cada etapa com **barra de progresso e porcentagem**:
 
 ```
-[3/3] Dependências (OpenCV + MediaPipe)
+[4/4] Modelo de detecção de mãos
   ██████████████████████████████ 100%
 ```
 
@@ -85,9 +94,30 @@ source .venv/bin/activate
 python src/main.py
 ```
 
-A janela da sua webcam será aberta e o programa começará a detectar suas mãos e contar os dedos em tempo real. Encerre com **Ctrl+C** no terminal.
+A janela da sua webcam será aberta e o programa começará a detectar suas mãos e contar os dedos em tempo real. Encerre com **Q** ou **ESC** na janela (ou fechando-a).
+
+> Se o modelo `hand_landmarker.task` ainda não estiver em `models/`, ele é baixado automaticamente nesta primeira execução.
 
 > No **macOS**, autorize o acesso à câmera para o seu terminal em **Ajustes > Privacidade e Segurança > Câmera**.
+
+<h3 id="opcoes-de-linha-de-comando">Opções de linha de comando</h3>
+
+Todos os parâmetros têm um padrão sensato — rodar sem argumentos funciona. Use `--help` para ver a lista completa.
+
+| Opção | Padrão | O que faz |
+|-------|--------|-----------|
+| `--camera N` | `0` | Índice da câmera a usar. |
+| `--max-hands N` | `2` | Número máximo de mãos detectadas ao mesmo tempo. |
+| `--detection-confidence F` | `0.5` | Confiança mínima para considerar uma detecção válida (0 a 1). |
+| `--tracking-confidence F` | `0.5` | Confiança mínima para manter o rastreamento entre frames (0 a 1). |
+| `--smooth-window N` | `5` | Frames usados na suavização anti-flicker da contagem. |
+| `--mirror` / `--no-mirror` | `--mirror` | Espelha (ou não) a imagem da câmera. |
+| `--model ARQUIVO` | `models/hand_landmarker.task` | Caminho do modelo; baixado se estiver faltando. |
+
+```bash
+# Segunda câmera, uma mão só e sem espelhamento
+.venv/bin/python src/main.py --camera 1 --max-hands 1 --no-mirror
+```
 
 <details>
 <summary>🔧 <strong>Setup manual</strong> — sem o <code>setup.sh</code></summary>
@@ -112,9 +142,10 @@ A estrutura do projeto é simples e organizada da seguinte forma:
 ├── .github
 │   ├── ISSUE_TEMPLATE/   # templates de bug e sugestão de funcionalidade
 │   └── pull_request_template.md
+├── models/               # hand_landmarker.task (baixado, fora do versionamento)
 ├── src
-│   └── main.py           # lógica de detecção e contagem
-├── setup.sh              # configura o ambiente (venv + dependências)
+│   └── main.py           # lógica de contagem (pura) + captura, desenho e CLI
+├── setup.sh              # configura o ambiente (venv + dependências + modelo)
 ├── requirements.txt      # OpenCV + MediaPipe (versões fixadas)
 ├── Plano_melhoria.md     # roteiro técnico de evolução do projeto
 ├── CONTRIBUTING.md       # como contribuir
