@@ -1,0 +1,10 @@
+# Dependências do Contador de Dedos — versões fixadas para build reproduzível.
+#
+# Instalação (ver README / setup.sh):
+#   pip install --no-compile -r requirements.txt
+#
+# Para atualizar: suba a versão aqui, rode `./setup.sh --reinstall` e confirme
+# que o app ainda roda antes de commitar.
+
+opencv-python==5.0.0.93
+mediapipe==0.10.35

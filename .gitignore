@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Ambiente virtual
+.venv/
+venv/
+
+# IDE / SO
+.idea/
+.vscode/
+.DS_Store
+
+# Ferramentas de IA
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.claude.json
+.mcp.json

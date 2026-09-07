@@ -1,0 +1,71 @@
+name: 🐛 Reportar bug
+description: Algo não funciona como deveria (crash, contagem errada, webcam não abre...)
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar! Quanto mais detalhes, mais rápido o conserto.
+        Antes de abrir, confira se já não existe uma issue parecida.
+
+  - type: textarea
+    id: descricao
+    attributes:
+      label: O que aconteceu?
+      description: Descreva o problema e o que você esperava que acontecesse.
+      placeholder: |
+        Ao levantar o polegar da mão esquerda, o contador continua em 0.
+        Esperava que fosse para 1.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproducao
+    attributes:
+      label: Passos para reproduzir
+      description: O passo a passo mínimo para o bug aparecer.
+      placeholder: |
+        1. Rodar `.venv/bin/python src/main.py`
+        2. Mostrar a mão esquerda aberta para a webcam
+        3. Fechar todos os dedos menos o polegar
+        4. O número exibido não muda
+    validations:
+      required: true
+
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Traceback / saída do terminal
+      description: Cole o erro completo, se houver. (Formatado automaticamente como código.)
+      render: shell
+
+  - type: input
+    id: so
+    attributes:
+      label: Sistema operacional
+      placeholder: "macOS 15.6 / Ubuntu 24.04 / Windows 11"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Versão do Python
+      description: Saída de `python --version` (ou `.venv/bin/python --version`).
+      placeholder: "3.11.9"
+    validations:
+      required: true
+
+  - type: input
+    id: webcam
+    attributes:
+      label: Webcam
+      description: Modelo/tipo, se o problema for de captura de imagem.
+      placeholder: "FaceTime HD integrada / Logitech C920 via USB"
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Contexto adicional
+      description: Prints, GIFs ou qualquer coisa que ajude a entender o problema.

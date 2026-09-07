@@ -1,0 +1,55 @@
+name: ✨ Sugerir funcionalidade
+description: Uma ideia nova — um modo de detecção, melhoria de UI, ajuste de UX...
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Boa! Antes de detalhar, dá uma olhada no [`Plano_melhoria.md`](../blob/development/Plano_melhoria.md) —
+        pode ser que a ideia já esteja no roteiro (e aí a conversa vira sobre prioridade).
+
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qual problema isso resolve?
+      description: Descreva a dor antes da solução. O que hoje é difícil ou impossível?
+      placeholder: "Hoje o app abre direto na contagem de dedos; não dá para escolher outra coisa."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solucao
+    attributes:
+      label: Solução proposta
+      description: O que você imagina? Mockups em ASCII, prints ou esboços de código são bem-vindos.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+      description: Outras abordagens que você pensou e por que descartou.
+
+  - type: dropdown
+    id: fase
+    attributes:
+      label: Fase relacionada no plano
+      description: Se souber, indique a fase do `Plano_melhoria.md`.
+      options:
+        - "Não sei / não se aplica"
+        - "Fase 1 — Correção e refatoração do núcleo"
+        - "Fase 2 — Qualidade e automação"
+        - "Fase 3 — Arquitetura modular"
+        - "Fase 4 — Interface interativa"
+        - "Fase 5 — Modos de visão adicionais"
+        - "Fase 6 — Identificação por face"
+        - "Fase 7 — Extras"
+
+  - type: checkboxes
+    id: ajuda
+    attributes:
+      label: Você gostaria de implementar?
+      options:
+        - label: Topo mandar um PR com essa funcionalidade

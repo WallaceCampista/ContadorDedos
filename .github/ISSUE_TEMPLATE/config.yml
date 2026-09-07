@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 Guia de contribuição
+    url: https://github.com/WallaceCampista/ContadorDedos/blob/development/CONTRIBUTING.md
+    about: Como configurar o ambiente, padrões de código e fluxo de PR.
+  - name: 🗺️ Plano de melhoria
+    url: https://github.com/WallaceCampista/ContadorDedos/blob/development/Plano_melhoria.md
+    about: Roteiro técnico do projeto — veja se sua ideia já está planejada.
