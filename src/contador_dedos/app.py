@@ -12,11 +12,22 @@ from collections.abc import Sequence
 import cv2
 
 from .config import AppConfig, parse_args
+from .core import audio
 from .core.camera import Camera, CameraError
 from .core.pipeline import FpsMeter, VideoClock
+from .core.recorder import Recorder, RecorderError
+from .i18n import set_language, t
 from .modes import Mode, build_hand_tracker, build_modes, close_modes
 from .ui.menu import QUIT_KEY, Menu, MenuEntry
-from .ui.widgets import Rect, draw_status_bar
+from .ui.theme import COLOR_ACCENT, COLOR_RECORDING
+from .ui.widgets import (
+    Rect,
+    draw_centered_text,
+    draw_status_bar,
+    draw_text,
+    hud_scale,
+    text_size,
+)
 from .vision.model import ModelError
 
 WINDOW_NAME = "Contador de Dedos"
@@ -25,6 +36,12 @@ WINDOW_NAME = "Contador de Dedos"
 KEYS_QUIT = (ord("q"), ord("Q"))
 #: Volta ao menu; no próprio menu, não faz nada.
 KEY_BACK = 27  # ESC
+#: Salva um PNG do que está na tela.
+KEY_SNAPSHOT = ord("s")
+#: Liga/desliga a gravação de vídeo.
+KEY_RECORD = ord("r")
+#: Por quantos frames um aviso do app fica na tela.
+NOTICE_FRAMES = 60
 
 BACK_LABEL = "← Voltar"
 #: Prefixo dos identificadores de modo nas entradas do menu.
@@ -81,6 +98,11 @@ class App:
         self._back_rect: Rect | None = None
         self._back_hovered = False
         self._back_requested = False
+        self.recorder = Recorder(config.output_dir)
+        self._notice: str | None = None
+        self._notice_frames = 0
+        self._snapshot_requested = False
+        self._record_requested = False
 
     # -- navegação ----------------------------------------------------------
 
@@ -117,6 +139,10 @@ class App:
         elif key == KEY_BACK:
             if not self.in_menu:
                 self.show_menu()
+        elif key == KEY_SNAPSHOT:
+            self._snapshot_requested = True
+        elif key == KEY_RECORD:
+            self._record_requested = True
         elif self.in_menu and is_printable(key):
             self.menu.select_shortcut(chr(key))
 
@@ -128,6 +154,66 @@ class App:
                 self._back_requested = True
                 return
         self.screen.on_mouse(event, x, y)
+
+    # -- captura ------------------------------------------------------------
+
+    def notify(self, message: str) -> None:
+        self._notice, self._notice_frames = message, NOTICE_FRAMES
+
+    def _apply_capture(self, frame) -> None:
+        """Executa os pedidos de snapshot e gravação feitos pelo teclado."""
+        if self._snapshot_requested:
+            self._snapshot_requested = False
+            try:
+                caminho = self.recorder.snapshot(frame)
+            except (RecorderError, OSError) as error:
+                self.notify(str(error))
+            else:
+                self.notify(f"{t('Snapshot salvo')}: {caminho.name}")
+
+        if self._record_requested:
+            self._record_requested = False
+            gravava = self.recorder.is_recording
+            try:
+                caminho = self.recorder.toggle(frame)
+            except (RecorderError, OSError) as error:
+                self.notify(f"{t('Não consegui gravar o vídeo')}: {error}")
+            else:
+                if gravava and caminho is not None:
+                    self.notify(f"{t('Vídeo salvo')}: {caminho.name}")
+
+    def _draw_overlays(self, frame) -> None:
+        """Indicador de gravação e aviso temporário, por cima de tudo.
+
+        Desenhados **depois** de o frame ir para o vídeo: o arquivo gravado sai
+        limpo, sem o próprio indicador de REC queimado em cima.
+        """
+        height, width = frame.shape[:2]
+        scale = hud_scale(height)
+        if self.recorder.is_recording:
+            segundos = int(self.recorder.elapsed)
+            rotulo = f"{t('Gravando')} {segundos // 60:02d}:{segundos % 60:02d}"
+            largura = text_size(rotulo, 0.5 * scale, max(1, int(scale)))[0]
+            x, y = width - largura - int(16 * scale), int(120 * scale)
+            cv2.circle(
+                frame,
+                (x - int(12 * scale), y - int(5 * scale)),
+                max(4, int(5 * scale)),
+                COLOR_RECORDING,
+                -1,
+                cv2.LINE_AA,
+            )
+            draw_text(frame, rotulo, (x, y), 0.5 * scale, COLOR_RECORDING, max(1, int(scale)))
+
+        if self._notice is None:
+            return
+        self._notice_frames -= 1
+        if self._notice_frames <= 0:
+            self._notice = None
+            return
+        draw_centered_text(
+            frame, self._notice, width // 2, height - int(52 * scale), 0.45 * scale, COLOR_ACCENT
+        )
 
     # -- loop ---------------------------------------------------------------
 
@@ -148,11 +234,15 @@ class App:
                     frame = self.screen.process(frame, clock.tick())
                     self._back_rect = draw_status_bar(
                         frame,
-                        self.screen.hint,
+                        t(self.screen.hint),
                         fps_meter.tick(),
-                        back_label=None if self.in_menu else BACK_LABEL,
+                        back_label=None if self.in_menu else t(BACK_LABEL),
                         back_hovered=self._back_hovered,
                     )
+
+                    self._apply_capture(frame)
+                    self.recorder.write(frame)
+                    self._draw_overlays(frame)
 
                     cv2.imshow(WINDOW_NAME, frame)
                     self.handle_key(cv2.waitKey(1) & 0xFF)
@@ -165,12 +255,15 @@ class App:
                     if window_was_closed():
                         self.running = False
             finally:
+                self.recorder.close()
                 cv2.destroyAllWindows()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Ponto de entrada: devolve 0 em caso de sucesso, 1 em caso de erro."""
     config = parse_args(argv)
+    set_language(config.language)
+    audio.configure(config.sound)
     try:
         with build_hand_tracker(config) as tracker:
             modes = build_modes(config, tracker)
@@ -183,4 +276,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     except KeyboardInterrupt:
         pass
+    finally:
+        audio.close()
     return 0

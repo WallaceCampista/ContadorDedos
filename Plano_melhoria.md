@@ -404,7 +404,9 @@ O modo de face **só é aceitável** com estas garantias:
    A migração para `pyproject.toml` fica para a Fase 2, junto com o entry point.
 3. ✅ Adicionar `CONTRIBUTING.md` e templates `.github/` (bug, feature, PR).
 
-> **Próxima fase:** [Fase 7 — Extras](#fase-7--extras).
+> **Situação:** roteiro concluído até a Fase 7. Restam três itens em aberto,
+> listados no fim da [Fase 7](#fase-7--extras) e no
+> [backlog](#7-backlog-priorizado).
 
 ### Fase 1 — Correção e refatoração do núcleo (P0 + P1) — ✅ **concluída**
 
@@ -441,10 +443,30 @@ contorno, para continuarem legíveis em webcams 1080p e fundos claros.
 > *reforça* a recomendação da Seção 5.4 de manter a detecção no MediaPipe.
 
 Uma nota sobre a regra do polegar: o rótulo do MediaPipe e a geometria da imagem
-seguem a **mesma** convenção de espelhamento, então `"Right" → tip.x > ip.x`
-vale com ou sem `cv2.flip` — o espelhamento muda apenas *a qual mão real* aquele
-rótulo corresponde (`real_hand()`). O esboço original desta seção invertia os
-sinais por assumir entrada não espelhada.
+seguem a **mesma** convenção, então a regra vale com ou sem `cv2.flip` — o
+espelhamento muda apenas *a qual mão real* aquele rótulo corresponde
+(`real_hand()`).
+
+> **⚠️ Correção posterior — o sinal estava invertido.** Esta fase concluiu que
+> `"Right" → tip.x > ip.x` e que, com espelho, o rótulo já era a mão real. **As
+> duas coisas estavam trocadas**, e o erro sobreviveu até a Fase 7 porque as
+> mãos sintéticas dos testes foram construídas na mesma convenção errada — elas
+> confirmavam a inversão em vez de detectá-la.
+>
+> O correto: o rótulo descreve a mão **como ela aparece na imagem**. Uma mão com
+> aparência de direita tem o polegar do lado esquerdo dela
+> (`"Right" → tip.x < ip.x`), e com o espelho ligado quem aparece como esquerda
+> é a mão direita da pessoa (`real_hand` troca).
+>
+> Duas evidências independentes fecharam a questão: o usuário levantou a mão
+> direita com o espelho ligado e a contagem apareceu no painel "Esquerda"; e o
+> código original do projeto (commit `06182fb`), que rodava **sem** espelho, já
+> usava `mão direita → ponta.x < articulação.x`. `test_convencao_do_rotulo_e_a_aparencia_na_imagem`
+> ancora isso e quebra primeiro se a convenção mudar.
+>
+> **Lição:** um fixture de teste derivado da mesma suposição que o código não
+> testa a suposição. Aqui só a realidade — a câmera e a mão de alguém — podia
+> arbitrar.
 
 ### Fase 2 — Qualidade e automação (P2) — ✅ **concluída**
 
@@ -688,12 +710,44 @@ nome, então `Mode.on_key(key) -> bool` foi acrescentado. A tela corrente tem a
 primeira chance na tecla; devolver `True` significa "consumi" — é isso que
 impede que digitar "q" em um campo de texto encerre o app.
 
-### Fase 7 — Extras
-- **Feedback sonoro** ao mudar a contagem/reconhecer alguém (opcional).
-- **Snapshots/gravação** (tecla `s`/`r`).
-- **Modo "controle por gesto"** (mapear gestos para ações do sistema).
-- **Versão web** com Streamlit/Gradio.
-- **Internacionalização** (pt/en) dos rótulos.
+### Fase 7 — Extras — ✅ **três de cinco** (por decisão de escopo)
+
+A fase é um cardápio de itens independentes e de tamanhos bem diferentes; foram
+escolhidos os três que cabem no app atual sem uma segunda arquitetura.
+
+**Entregues:**
+- ✅ **Snapshots/gravação** (`core/recorder.py`): **S** salva PNG, **R** liga e
+  desliga a gravação em MP4, em qualquer tela. Arquivos em `capturas/`, com data
+  e hora no nome. Grava o frame já anotado, e o indicador `● Gravando` é
+  desenhado **depois** de o frame ir para o arquivo — o vídeo sai limpo.
+- ✅ **Internacionalização pt/en** (`i18n.py`): o texto em português é a própria
+  chave, então o código continua legível e uma chave sem tradução degrada para o
+  português em vez de estourar. Flag `--lang`.
+- ✅ **Feedback sonoro** (`core/audio.py`): bipe curto ao mudar a contagem ou
+  reconhecer alguém, só na transição. **Desligado por padrão** (`--sound` liga):
+  um app que apita a cada frame seria insuportável.
+
+**Testes:** 358 (eram 310).
+
+> **Uma rede contra rótulo esquecido.** `tests/test_i18n.py` varre o código-fonte
+> atrás de `t("…")` e cobra tradução para cada literal encontrado. Sem isso, um
+> rótulo novo entraria só em português e ninguém notaria até alguém rodar em
+> inglês. O mesmo teste confere que os marcadores (`{n}`, `{nome}`) sobrevivem à
+> tradução — trocá-los quebraria o `.format()` em tempo de execução.
+
+> **Áudio degrada, não derruba.** O `sounddevice` depende do PortAudio, que não
+> existe em todo lugar (containers, CI, servidores). O import é tardio e
+> **qualquer** falha desliga o som e segue — um bipe que não toca nunca pode
+> custar um frame, muito menos o app.
+
+**Não entregues, por decisão de escopo:**
+- ⬜ **Modo "controle por gesto"** — precisa de `pyautogui` como dependência
+  nova, de permissão de **Acessibilidade** no macOS, e de definir quais gestos
+  disparam quais ações, com trava contra disparo acidental. Merece fase própria.
+- ⬜ **Versão web (Streamlit/Gradio)** — webcam em tempo real exige
+  `streamlit-webrtc`, e o resultado é efetivamente uma **segunda interface**,
+  duplicando o loop de vídeo e o roteamento de telas. O backlog já marcava
+  esforço **Alto**.
 
 ---
 
@@ -714,8 +768,10 @@ impede que digitar "q" em um campo de texto encerre o app.
 | P3 | Reconhecimento de gestos / Libras | 5 | Alto |
 | **Face** | **Modo Identificação por Face (detecção + embedding + base)** | **6** | **Alto** |
 | **Face** | **Cadastro + consentimento + garantias LGPD** | **6** | **Médio** |
-| P3 | Snapshots/gravação, feedback sonoro | 7 | Médio |
-| P3 | Versão web (Streamlit/Gradio) | 7 | Alto |
+| ~~P3~~ | ~~Snapshots/gravação, feedback sonoro~~ ✅ | 7 | Médio |
+| P3 | Modo "controle por gesto" (pendente) | 7 | Médio |
+| P3 | Versão web (Streamlit/Gradio) (pendente) | 7 | Alto |
+| P3 | Libras: numerais 0 e 6–10 (pendente) | 5 | Alto |
 
 ---
 

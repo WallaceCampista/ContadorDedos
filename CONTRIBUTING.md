@@ -37,7 +37,7 @@ Regras gerais:
 ```bash
 git clone <url-do-seu-fork>
 cd ContadorDedos
-./setup.sh          # valida o Python, cria o .venv e instala as dependências
+./setup.sh          # ambiente completo: .venv, dependências, ferramentas e modelos
 ```
 
 Executando o app:
@@ -47,12 +47,9 @@ Executando o app:
 # ou: source .venv/bin/activate && python -m contador_dedos
 ```
 
-Para desenvolver, instale também as ferramentas de qualidade e ative os hooks:
-
-```bash
-.venv/bin/python -m pip install -e ".[dev]"
-.venv/bin/pre-commit install
-```
+O `setup.sh` já instala as ferramentas de qualidade (pytest, ruff, black,
+pre-commit) e ativa os hooks do pre-commit. Para um ambiente só de execução, use
+`./setup.sh --no-dev`.
 
 Se atualizar as dependências, rode `./setup.sh --reinstall`. O script é
 idempotente — pode rodar quantas vezes quiser.

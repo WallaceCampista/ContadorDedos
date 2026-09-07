@@ -23,6 +23,9 @@ CLAUDE.local.md
 models/
 *.task
 
+# Snapshots e gravações do usuário
+capturas/
+
 # Dados biométricos e modelos — NUNCA versionar (LGPD, Art. 5º, II)
 faces/
 *.npz

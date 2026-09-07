@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 import cv2
 
+from ..i18n import t
 from .theme import (
     CARD_ALPHA,
     COLOR_ACCENT,
@@ -264,8 +265,8 @@ def draw_hand_readout(
 
     left_hand, right_hand = ("Left", "Right") if mirrored else ("Right", "Left")
     colunas = (
-        (left_hand, "Esquerda" if mirrored else "Direita", False),
-        (right_hand, "Direita" if mirrored else "Esquerda", True),
+        (left_hand, t("Esquerda") if mirrored else t("Direita"), False),
+        (right_hand, t("Direita") if mirrored else t("Esquerda"), True),
     )
 
     for hand, side_label, align_right in colunas:

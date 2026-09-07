@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .i18n import DEFAULT_LANGUAGE, LANGUAGES
 from .vision.embedder import DEFAULT_THRESHOLD as DEFAULT_FACE_THRESHOLD
 
 #: Onde o modelo fica em disco (gitignorado — ver `.gitignore`).
@@ -17,6 +18,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MODEL_PATH = _PROJECT_ROOT / "models" / "hand_landmarker.task"
 #: Base de rostos: local, fora do versionamento, com acesso restrito ao usuário.
 DEFAULT_FACES_DB = _PROJECT_ROOT / "faces" / "faces.npz"
+#: Onde os snapshots e as gravações são salvos.
+DEFAULT_OUTPUT_DIR = _PROJECT_ROOT / "capturas"
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,9 @@ class AppConfig:
     model_path: Path = DEFAULT_MODEL_PATH
     faces_db: Path = DEFAULT_FACES_DB
     face_threshold: float = DEFAULT_FACE_THRESHOLD
+    output_dir: Path = DEFAULT_OUTPUT_DIR
+    language: str = DEFAULT_LANGUAGE
+    sound: bool = False
 
     @property
     def models_dir(self) -> Path:
@@ -103,6 +109,34 @@ def parse_args(argv: Sequence[str] | None = None) -> AppConfig:
         help="distância máxima para reconhecer um rosto; menor = mais rigor "
         "(padrão: %(default)s)",
     )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=defaults.output_dir,
+        metavar="PASTA",
+        help="onde salvar snapshots e gravações (padrão: %(default)s)",
+    )
+    parser.add_argument(
+        "--lang",
+        choices=LANGUAGES,
+        default=defaults.language,
+        help="idioma da interface (padrão: %(default)s)",
+    )
+    som = parser.add_mutually_exclusive_group()
+    som.add_argument(
+        "--sound",
+        dest="sound",
+        action="store_true",
+        help="bipe ao mudar a contagem ou reconhecer alguém",
+    )
+    som.add_argument(
+        "--no-sound",
+        dest="sound",
+        action="store_false",
+        help="sem feedback sonoro (padrão)",
+    )
+    parser.set_defaults(sound=defaults.sound)
+
     mirror = parser.add_mutually_exclusive_group()
     mirror.add_argument(
         "--mirror",
@@ -144,4 +178,7 @@ def parse_args(argv: Sequence[str] | None = None) -> AppConfig:
         model_path=args.model,
         faces_db=args.faces_db,
         face_threshold=args.face_threshold,
+        output_dir=args.output_dir,
+        language=args.lang,
+        sound=args.sound,
     )

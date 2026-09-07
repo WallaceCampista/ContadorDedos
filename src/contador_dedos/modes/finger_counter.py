@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from ..core import audio
 from ..core.overlay import draw_hand_landmarks
 from ..core.pipeline import ValueSmoother
+from ..i18n import t
 from ..ui.theme import COLOR_TEXT, COLOR_TOTAL
 from ..ui.widgets import Rect, draw_center_message, draw_panel, draw_text, hud_scale
 from ..vision.hands import HandTracker, real_hand
@@ -71,21 +73,25 @@ def draw_counters(img, counts: dict[str, int | None], mirrored: bool) -> None:
     # Cada painel fica do lado da tela em que aquela mão realmente aparece.
     left_hand, right_hand = ("Left", "Right") if mirrored else ("Right", "Left")
     draw_counter(
-        img, "Esquerda" if mirrored else "Direita", counts[left_hand], int(10 * scale), scale
+        img,
+        t("Esquerda") if mirrored else t("Direita"),
+        counts[left_hand],
+        int(10 * scale),
+        scale,
     )
     draw_counter(
         img,
-        "Direita" if mirrored else "Esquerda",
+        t("Direita") if mirrored else t("Esquerda"),
         counts[right_hand],
         width - int(130 * scale),
         scale,
     )
 
     total = sum(value for value in counts.values() if value is not None)
-    draw_counter(img, "Total", total, width // 2 - int(30 * scale), scale, COLOR_TOTAL)
+    draw_counter(img, t("Total"), total, width // 2 - int(30 * scale), scale, COLOR_TOTAL)
 
     if all(value is None for value in counts.values()):
-        draw_center_message(img, "Nenhuma mão detectada", scale)
+        draw_center_message(img, t("Nenhuma mão detectada"), scale)
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +113,7 @@ class FingerCounter(Mode):
             "Left": ValueSmoother(smooth_window),
             "Right": ValueSmoother(smooth_window),
         }
+        self._last_total: int | None = None
 
     @classmethod
     def from_config(cls, config, tracker: HandTracker) -> FingerCounter:
@@ -124,6 +131,13 @@ class FingerCounter(Mode):
             )
 
         smoothed = {hand: self._smoothers[hand].update(value) for hand, value in counts.items()}
+        total = sum(value for value in smoothed.values() if value is not None)
+        if total != self._last_total:
+            # Só na transição: bipar a cada frame viraria um zumbido.
+            if self._last_total is not None:
+                audio.beep("change")
+            self._last_total = total
+
         draw_counters(frame, smoothed, self._mirrored)
         return frame
 

@@ -56,6 +56,21 @@ def normalize(vector: np.ndarray) -> np.ndarray:
     return (vector / norm).astype(np.float32)
 
 
+def ensure_arcface_model(model_path: Path) -> Path:
+    """Garante o modelo ArcFace em disco, extraindo-o do pacote publicado.
+
+    Ponto único usado pelo `setup.sh` e pelo :class:`ArcFaceEmbedder`, para que a
+    URL e os hashes tenham um só dono.
+    """
+    return ensure_model_from_archive(
+        model_path,
+        ARCFACE_ARCHIVE_URL,
+        ARCFACE_ARCHIVE_SHA256,
+        ARCFACE_MEMBER,
+        ARCFACE_SHA256,
+    )
+
+
 class ArcFaceEmbedder:
     """ArcFace (MobileFaceNet, 512-d) sobre `onnxruntime`."""
 
@@ -64,13 +79,7 @@ class ArcFaceEmbedder:
     def __init__(self, model_path: Path) -> None:
         import onnxruntime  # importado aqui: só o modo de rosto paga esse custo
 
-        ensure_model_from_archive(
-            model_path,
-            ARCFACE_ARCHIVE_URL,
-            ARCFACE_ARCHIVE_SHA256,
-            ARCFACE_MEMBER,
-            ARCFACE_SHA256,
-        )
+        ensure_arcface_model(model_path)
         self._session = onnxruntime.InferenceSession(
             str(model_path), providers=["CPUExecutionProvider"]
         )

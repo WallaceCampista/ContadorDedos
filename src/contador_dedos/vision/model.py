@@ -34,7 +34,7 @@ def download_model(destination: Path, url: str, sha256: str) -> None:
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = destination.with_suffix(destination.suffix + ".part")
-    print(f"Baixando o modelo de detecção (~7,5 MB) para {destination}…")
+    print(f"Baixando {destination.name}…")
     try:
         with urllib.request.urlopen(url, timeout=60) as response, partial.open("wb") as out:
             total = int(response.headers.get("Content-Length") or 0)
@@ -47,7 +47,7 @@ def download_model(destination: Path, url: str, sha256: str) -> None:
                 downloaded += len(chunk)
                 if total:
                     print(f"\r  {downloaded * 100 // total:3d}%", end="", flush=True)
-        print("\r  100%")
+        print(f"\r  100%  ({downloaded / 1e6:.1f} MB)")
     except (urllib.error.URLError, OSError) as error:
         partial.unlink(missing_ok=True)
         raise ModelError(

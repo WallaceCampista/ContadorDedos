@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Contador de Dedos — setup do ambiente de desenvolvimento.
-# Prepara tudo para rodar o app: valida o Python, cria um ambiente virtual
-# (.venv) e instala as dependências (OpenCV + MediaPipe). NÃO abre a webcam —
-# a execução fica por sua conta (ver o resumo ao final).
+# Contador de Dedos — setup do ambiente.
+# Deixa tudo pronto em um comando: valida o Python, cria o ambiente virtual,
+# instala as dependências e as ferramentas de desenvolvimento, baixa TODOS os
+# modelos e verifica que o app importa e que a câmera responde.
 #
 # Uso:
-#   ./setup.sh                 # configura o ambiente
-#   ./setup.sh --reinstall     # recria/atualiza as dependências
-#   ./setup.sh -h              # ajuda
+#   ./setup.sh                  # ambiente completo
+#   ./setup.sh --no-dev         # sem pytest/ruff/black/pre-commit
+#   ./setup.sh --skip-models    # sem baixar modelos (~130 MB)
+#   ./setup.sh --reinstall      # reinstala as dependências
+#   ./setup.sh -h               # ajuda
 #
-# Idempotente: pode ser executado várias vezes com segurança.
+# Idempotente: nada é rebaixado ou reinstalado à toa, então pode rodar de novo.
 
 set -eo pipefail
 
@@ -17,10 +19,14 @@ set -eo pipefail
 # Flags
 # ------------------------------------------------------------------------------
 REINSTALL=false
+DEV=true
+MODELS=true
 
 for arg in "$@"; do
     case "$arg" in
-        --reinstall)  REINSTALL=true ;;
+        --reinstall)   REINSTALL=true ;;
+        --no-dev)      DEV=false ;;
+        --skip-models) MODELS=false ;;
         -h|--help)
             awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$0"
             exit 0
@@ -68,7 +74,7 @@ print_header() {
 # ------------------------------------------------------------------------------
 BAR_WIDTH=30
 STEP=0
-TOTAL_STEPS=4   # Python, ambiente virtual, dependências, modelo
+TOTAL_STEPS=5   # Python, venv, dependências, modelos, verificação
 
 draw_bar() { # $1 = porcentagem (0-100)
     local pct="$1" filled i out=""
@@ -143,25 +149,47 @@ print_success "Usando $($PYTHON --version 2>&1) ($PYTHON)"
 # ==============================================================================
 progress_header "Ambiente virtual (.venv)"
 
+# Binários do venv (Scripts no Windows, bin no restante).
+venv_paths() {
+    VENV_BIN=".venv/bin"
+    [ -d ".venv/Scripts" ] && VENV_BIN=".venv/Scripts"
+    VENV_PY="${VENV_BIN}/python"
+}
+venv_paths
+
+# Um venv guarda caminhos absolutos: renomear ou mover a pasta do projeto o
+# quebra, e o erro que aparece depois ("No such file or directory" apontando
+# para o caminho antigo) não diz isso. Melhor detectar aqui.
+if [ -d ".venv" ] && ! "$VENV_PY" -c 'import sys' &> /dev/null; then
+    print_warning "O .venv existente não executa (o projeto foi movido ou renomeado?)."
+    print_info "Recriando do zero..."
+    rm -rf .venv
+fi
+
 if [ -d ".venv" ]; then
     print_success ".venv já existe (reutilizando)"
 else
     print_info "Criando o ambiente virtual..."
     "$PYTHON" -m venv .venv
+    venv_paths
     print_success ".venv criado"
 fi
-
-# Binários do venv (Scripts no Windows, bin no restante).
-VENV_BIN=".venv/bin"
-[ -d ".venv/Scripts" ] && VENV_BIN=".venv/Scripts"
-VENV_PY="${VENV_BIN}/python"
+venv_paths
 
 # ==============================================================================
 # 3. Dependências (OpenCV + MediaPipe)
 # ==============================================================================
-progress_header "Dependências (OpenCV + MediaPipe)"
+if [ "$DEV" = true ]; then
+    progress_header "Dependências + ferramentas de desenvolvimento"
+    PIP_TARGET=".[dev]"
+    CHECK_IMPORTS='import cv2, mediapipe, onnxruntime, pytest, ruff'
+else
+    progress_header "Dependências (OpenCV + MediaPipe + ONNX Runtime)"
+    PIP_TARGET="."
+    CHECK_IMPORTS='import cv2, mediapipe, onnxruntime'
+fi
 
-if [ "$REINSTALL" = false ] && "$VENV_PY" -c 'import cv2, mediapipe' &> /dev/null; then
+if [ "$REINSTALL" = false ] && "$VENV_PY" -c "$CHECK_IMPORTS" &> /dev/null; then
     print_success "Dependências já instaladas (use --reinstall para atualizar)"
 else
     print_info "Instalando dependências (a 1ª vez baixa ~algumas centenas de MB)..."
@@ -171,7 +199,7 @@ else
     # compilação de bytecode do pip estoura e aborta a instalação inteira. Pular a
     # compilação resolve — o .pyc é gerado sob demanda no import e o app nunca
     # importa esse arquivo de teste.
-    if "$VENV_PY" -m pip install --no-compile -r requirements.txt; then
+    if "$VENV_PY" -m pip install --no-compile -e "$PIP_TARGET"; then
         print_success "Dependências instaladas"
     else
         print_error "Falha ao instalar as dependências (veja os erros acima)."
@@ -181,25 +209,91 @@ else
 fi
 
 # ==============================================================================
-# 4. Modelo de detecção de mãos (hand_landmarker.task)
+# 4. Modelos de visão
 # ==============================================================================
-progress_header "Modelo de detecção de mãos"
+progress_header "Modelos de visão"
 
 # O MediaPipe 0.10.35 removeu a API legada `mp.solutions`; a Tasks API que a
-# substituiu precisa do arquivo de modelo, que não vem no wheel. O download (e a
-# verificação de integridade) mora em contador_dedos/vision/, para que a URL
-# hash tenham um único dono — e para que rodar o app sem o setup.sh também
-# funcione.
-MODEL_FILE="models/hand_landmarker.task"
-
-if [ -f "$MODEL_FILE" ]; then
-    print_success "Modelo já baixado ($MODEL_FILE)"
-elif "$VENV_PY" -c "from contador_dedos.config import DEFAULT_MODEL_PATH; from contador_dedos.vision.hands import ensure_hand_model; ensure_hand_model(DEFAULT_MODEL_PATH)"; then
-    print_success "Modelo baixado em $MODEL_FILE"
+# substituiu precisa dos arquivos de modelo, que não vêm no wheel. Os downloads
+# (com verificação de integridade) moram em contador_dedos/vision/, para que as
+# URLs e os hashes tenham um único dono — e para que o app também funcione sem
+# ter passado por aqui.
+if [ "$MODELS" = false ]; then
+    print_warning "Pulando os modelos (--skip-models)."
+    print_info "O app baixa cada um sob demanda, na primeira vez que o modo abrir."
 else
-    print_error "Falha ao baixar o modelo de detecção de mãos."
-    print_info "Verifique sua conexão e rode o setup novamente — o app também baixa o modelo na 1ª execução."
+    print_info "Baixando o que faltar (mãos ~7,5 MB · rosto ~0,2 MB · ArcFace ~122 MB)."
+    print_info "O pacote do ArcFace é descartado após a extração; ficam ~14 MB."
+    if "$VENV_PY" - <<'PYTHON'
+from contador_dedos.config import AppConfig
+from contador_dedos.vision.embedder import ARCFACE_FILENAME, ensure_arcface_model
+from contador_dedos.vision.faces import FACE_MODEL_FILENAME, ensure_face_model
+from contador_dedos.vision.hands import ensure_hand_model
+
+config = AppConfig()
+alvos = (
+    ("detecção de mãos", ensure_hand_model, config.model_path),
+    ("detecção de rosto", ensure_face_model, config.models_dir / FACE_MODEL_FILENAME),
+    ("ArcFace (reconhecimento facial)", ensure_arcface_model, config.models_dir / ARCFACE_FILENAME),
+)
+for nome, garantir, caminho in alvos:
+    ja_existia = caminho.is_file()
+    garantir(caminho)
+    print(f"  {'ja tinha  ' if ja_existia else 'baixado   '} {nome}: {caminho.name}")
+PYTHON
+    then
+        print_success "Modelos prontos em models/"
+    else
+        print_error "Falha ao obter os modelos."
+        print_info "Verifique sua conexão e rode o setup de novo, ou use --skip-models"
+        print_info "para deixar que o app baixe cada um quando o modo for aberto."
+        exit 1
+    fi
+fi
+
+# ==============================================================================
+# 5. Verificação
+# ==============================================================================
+progress_header "Verificação"
+
+if "$VENV_PY" -c 'import contador_dedos; print(contador_dedos.__version__)' > /dev/null 2>&1; then
+    VERSAO="$("$VENV_PY" -c 'import contador_dedos; print(contador_dedos.__version__)')"
+    print_success "Pacote importa corretamente (versão ${VERSAO})"
+else
+    print_error "O pacote não importa. Rode ./setup.sh --reinstall."
     exit 1
+fi
+
+# Hooks de qualidade: só fazem sentido com as ferramentas instaladas e em um repo.
+if [ "$DEV" = true ] && [ -d ".git" ]; then
+    if "$VENV_BIN/pre-commit" install > /dev/null 2>&1; then
+        print_success "Hooks de pre-commit instalados"
+    else
+        print_warning "Não consegui instalar os hooks de pre-commit (siga sem eles)."
+    fi
+fi
+
+# A câmera é metade do projeto: melhor descobrir agora que a permissão falta do
+# que na primeira execução. No macOS, isto dispara o pedido de autorização.
+print_info "Testando o acesso à câmera (a luz pode acender por um instante)..."
+CAMERA_OK=$("$VENV_PY" - <<'PYTHON' 2>/dev/null || echo "erro"
+import cv2
+
+captura = cv2.VideoCapture(0)
+aberta = captura.isOpened()
+captura.release()
+print("sim" if aberta else "nao")
+PYTHON
+)
+if [ "$CAMERA_OK" = "sim" ]; then
+    print_success "Câmera acessível"
+else
+    print_warning "Não consegui abrir a câmera 0."
+    if [ "$PLATFORM" = "macos" ]; then
+        print_info "No macOS, autorize em Ajustes > Privacidade e Segurança > Câmera —"
+        print_info "para o app de onde você vai rodar (Terminal, iTerm ou PyCharm)."
+    fi
+    print_info "Outra câmera? Use: ${VENV_BIN}/python -m contador_dedos --camera 1"
 fi
 
 # ==============================================================================
@@ -213,14 +307,15 @@ echo -e "  ${GREEN}$(draw_bar 100)${NC} 100%"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-echo "Para executar (abre a webcam):"
+echo "Para executar (abre a webcam no menu):"
 echo ""
 echo -e "  ${GREEN}${VENV_BIN}/python -m contador_dedos${NC}"
 echo ""
-print_info "Ou use o comando instalado: ${GREEN}${VENV_BIN}/contador-dedos${NC}"
+print_info "Ou pelo comando instalado: ${GREEN}${VENV_BIN}/contador-dedos${NC}"
 print_info "Ative o ambiente com:  ${GREEN}source ${VENV_BIN}/activate${NC}  (depois: ${GREEN}python -m contador_dedos${NC})"
-if [ "$PLATFORM" = "macos" ]; then
-    print_info "No macOS, autorize a câmera para o seu terminal em Ajustes > Privacidade e Segurança > Câmera."
+if [ "$DEV" = true ]; then
+    echo ""
+    print_info "Checagens locais: ${GREEN}${VENV_BIN}/pytest${NC} · ${GREEN}${VENV_BIN}/ruff check .${NC} · ${GREEN}${VENV_BIN}/black --check .${NC}"
 fi
 echo ""
 print_success "Ambiente pronto. Bom trabalho!"

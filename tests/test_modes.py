@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import pytest
 
-from contador_dedos.app import KEY_BACK, App, build_menu, should_quit
+from contador_dedos.app import KEY_BACK, NOTICE_FRAMES, App, build_menu, should_quit
 from contador_dedos.config import AppConfig
 from contador_dedos.modes import MODE_FACTORIES, Mode, build_modes, close_modes
 from contador_dedos.modes.face_id import FaceId
@@ -282,3 +282,82 @@ def test_modo_recebe_o_frame_e_o_timestamp():
     frame = np.zeros((4, 4, 3), dtype=np.uint8)
     assert modo.process(frame, 42) is frame
     assert modo.processados == [42]
+
+
+# --- captura (Fase 7) -------------------------------------------------------
+
+
+def test_tecla_s_pede_snapshot():
+    app = App(AppConfig(), [FakeMode()])
+    app.handle_key(ord("s"))
+    assert app._snapshot_requested is True
+    assert app.running is True, "capturar não pode encerrar o app"
+
+
+def test_tecla_r_pede_gravacao():
+    app = App(AppConfig(), [FakeMode()])
+    app.handle_key(ord("r"))
+    assert app._record_requested is True
+
+
+def test_snapshot_salva_e_avisa(tmp_path):
+    app = App(AppConfig(output_dir=tmp_path), [FakeMode()])
+    app.handle_key(ord("s"))
+    app._apply_capture(_frame())
+    assert list(tmp_path.glob("*.png"))
+    assert "Snapshot" in app._notice
+
+
+def test_gravacao_liga_e_desliga(tmp_path):
+    app = App(AppConfig(output_dir=tmp_path), [FakeMode()])
+    app.handle_key(ord("r"))
+    app._apply_capture(_frame())
+    assert app.recorder.is_recording is True
+    app.recorder.write(_frame())
+    app.handle_key(ord("r"))
+    app._apply_capture(_frame())
+    assert app.recorder.is_recording is False
+    assert list(tmp_path.glob("*.mp4"))
+
+
+def test_indicador_de_rec_e_desenhado_apos_a_gravacao(tmp_path):
+    """O vídeo sai limpo: o indicador entra no frame depois de ele ser gravado."""
+    app = App(AppConfig(output_dir=tmp_path), [FakeMode()])
+    app.recorder.start(_frame())
+    gravado = _frame()
+    app.recorder.write(gravado)
+    assert not gravado.any(), "o frame gravado não pode ter o indicador"
+    app._draw_overlays(gravado)
+    assert gravado.any(), "o indicador precisa aparecer na tela"
+    app.recorder.close()
+
+
+def test_falha_ao_gravar_vira_aviso_e_nao_excecao(tmp_path):
+    arquivo = tmp_path / "bloqueio"
+    arquivo.write_text("nao sou pasta")
+    app = App(AppConfig(output_dir=arquivo / "dentro"), [FakeMode()])
+    app.handle_key(ord("s"))
+    app._apply_capture(_frame())
+    assert app._notice is not None
+    assert app.running is True
+
+
+def test_aviso_some_sozinho():
+    app = App(AppConfig(), [FakeMode()])
+    app.notify("oi")
+    for _ in range(NOTICE_FRAMES + 1):
+        app._draw_overlays(_frame())
+    assert app._notice is None
+
+
+def test_modo_tem_prioridade_sobre_as_teclas_de_captura():
+    """Digitar "s" num campo de texto não pode salvar um snapshot."""
+
+    class Digitando(FakeMode):
+        def on_key(self, key):
+            return True
+
+    app = App(AppConfig(), [Digitando()])
+    app.open_mode(0)
+    app.handle_key(ord("s"))
+    assert app._snapshot_requested is False

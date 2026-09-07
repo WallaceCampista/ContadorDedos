@@ -14,8 +14,9 @@ from .landmarks import (
     FINGER_TIP_IDS,
     INDEX_MCP,
     MIDDLE_MCP,
+    PINKY_MCP,
     PIP_OFFSET,
-    THUMB_IP,
+    THUMB_MCP,
     THUMB_TIP,
     WRIST,
     Point,
@@ -42,18 +43,26 @@ def hand_span(landmarks: Sequence[Point]) -> float:
     return distance(landmarks[WRIST], landmarks[MIDDLE_MCP])
 
 
-def is_thumb_extended(landmarks: Sequence[Point], handedness: str) -> bool:
+def is_thumb_extended(landmarks: Sequence[Point], handedness: str | None = None) -> bool:
     """Diz se o polegar está estendido.
 
-    ``handedness`` é o rótulo devolvido pelo MediaPipe (``"Left"``/``"Right"``)
-    **para o mesmo frame** de onde vieram os landmarks. O MediaPipe classifica
-    a lateralidade assumindo uma imagem espelhada, e essa mesma convenção fixa
-    o sentido em que o polegar aponta no eixo X — por isso a regra abaixo vale
-    tanto com quanto sem ``cv2.flip``.
+    Compara a **ponta** do polegar com a **base dele** (a articulação MCP),
+    medindo a distância de cada uma até a base do dedo mínimo — o ponto da palma
+    mais afastado do polegar.
+
+    Por que não comparar a ponta com a articulação IP no eixo X, como antes: IP e
+    ponta são vizinhas, só a falange distal as separa. Com o polegar aberto de
+    lado a diferença é visível, mas com o polegar subindo junto dos dedos ela
+    encolhe a poucos pixels e a decisão sai no ruído — era isso que fazia a mão
+    aberta contar 4. Da base à ponta o segmento é umas três vezes maior.
+
+    Medir por distância também elimina a dependência da lateralidade: recolher o
+    polegar leva a ponta *na direção* do mínimo, encurtando a distância, e isso
+    vale para as duas mãos, em qualquer inclinação. ``handedness`` é aceito só
+    por compatibilidade com quem já chamava a função, e é ignorado.
     """
-    if handedness == "Right":
-        return landmarks[THUMB_TIP][0] > landmarks[THUMB_IP][0]
-    return landmarks[THUMB_TIP][0] < landmarks[THUMB_IP][0]
+    reference = landmarks[PINKY_MCP]
+    return distance(landmarks[THUMB_TIP], reference) > distance(landmarks[THUMB_MCP], reference)
 
 
 def is_thumb_up(landmarks: Sequence[Point]) -> bool:
@@ -76,7 +85,7 @@ def fingers_extended(landmarks: Sequence[Point], handedness: str) -> tuple[bool,
     """
     validate(landmarks)
     return (
-        is_thumb_extended(landmarks, handedness),
+        is_thumb_extended(landmarks),
         *(landmarks[tip][1] < landmarks[tip - PIP_OFFSET][1] for tip in FINGER_TIP_IDS),
     )
 

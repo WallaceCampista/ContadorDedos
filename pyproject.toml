@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "contador-dedos"
-version = "0.4.0"
+version = "0.5.0"
 description = "Conta os dedos levantados em tempo real usando a webcam, com OpenCV e MediaPipe."
 readme = "README.md"
 license = "MIT"
@@ -35,6 +35,9 @@ dependencies = [
     "mediapipe==0.10.35",
     # Roda o ArcFace do modo Rosto (ID). Wheel pronto — não compila nada.
     "onnxruntime==1.19.2",
+    # Feedback sonoro opcional (--sound). Import tardio: sem PortAudio,
+    # o som apenas não toca.
+    "sounddevice==0.5.5",
 ]
 
 [project.optional-dependencies]

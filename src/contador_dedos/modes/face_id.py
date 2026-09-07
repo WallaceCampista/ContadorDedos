@@ -17,7 +17,9 @@ from enum import Enum, auto
 import cv2
 import numpy as np
 
+from ..core import audio
 from ..core.pipeline import ValueSmoother
+from ..i18n import t
 from ..storage.faces_db import MAX_NAME_LENGTH, FaceDB, FaceDBError
 from ..ui.theme import COLOR_ACCENT, COLOR_MUTED, COLOR_TEXT
 from ..ui.widgets import (
@@ -103,6 +105,7 @@ class FaceId(Mode):
         self._message: str | None = None
         self._message_frames = 0
         self._smoother = ValueSmoother(smooth_window)
+        self._last_known: str | None = None
 
     @classmethod
     def from_config(cls, config, _hand_tracker=None) -> FaceId:
@@ -179,7 +182,7 @@ class FaceId(Mode):
                 self._captured.clear()
                 self.stage = Stage.CAPTURING
             else:
-                self._notify("Digite um nome para continuar.")
+                self._notify(t("Digite um nome para continuar."))
         elif action == "manage":
             self.stage = Stage.MANAGING
         elif action == "back":
@@ -193,7 +196,8 @@ class FaceId(Mode):
         except FaceDBError as error:
             self._notify(str(error))
             return
-        self._notify(f"'{name}' excluído." if apagado else f"'{name}' não estava cadastrado.")
+        modelo = "'{nome}' excluído." if apagado else "'{nome}' não estava cadastrado."
+        self._notify(t(modelo).format(nome=name))
 
     def _notify(self, message: str) -> None:
         self._message, self._message_frames = message, MESSAGE_FRAMES
@@ -208,7 +212,7 @@ class FaceId(Mode):
 
         if self._error is not None:
             draw_veil(frame)
-            draw_center_message(frame, "Reconhecimento facial indisponível", scale)
+            draw_center_message(frame, t("Reconhecimento facial indisponível"), scale)
             self._draw_footer_note(frame, scale, self._error[:90])
             return frame
 
@@ -217,7 +221,7 @@ class FaceId(Mode):
                 # Mostra o aviso um frame ANTES de bloquear no download.
                 self._announced = True
                 draw_veil(frame)
-                draw_center_message(frame, "Preparando… (1ª vez baixa ~122 MB)", scale)
+                draw_center_message(frame, t("Preparando… (1ª vez baixa ~122 MB)"), scale)
                 return frame
             self._prepare()
             return frame
@@ -256,26 +260,31 @@ class FaceId(Mode):
             nomes.append(nome)
             self._draw_face(frame, face, nome, distancia, scale)
         if not faces:
-            draw_center_message(frame, "Nenhum rosto detectado", scale)
+            draw_center_message(frame, t("Nenhum rosto detectado"), scale)
         elif not self.db.names():
-            draw_center_message(frame, "Nenhum rosto cadastrado ainda", scale)
-        self._smoother.update(nomes[0] if nomes else None)
+            draw_center_message(frame, t("Nenhum rosto cadastrado ainda"), scale)
+        reconhecido = self._smoother.update(next((n for n in nomes if n), None))
+        if reconhecido and reconhecido != self._last_known:
+            audio.beep("recognized")
+        self._last_known = reconhecido
 
     def _capture(self, frame, faces, scale: float) -> None:
         if len(faces) != 1:
             aviso = "Mostre apenas um rosto" if faces else "Nenhum rosto detectado"
-            draw_center_message(frame, aviso, scale)
+            draw_center_message(frame, t(aviso), scale)
         else:
             embedding = self._embed(frame, faces[0])
             if embedding is not None:
                 self._captured.append(embedding)
             self._draw_face(frame, faces[0], self._typed, 0.0, scale, capturing=True)
 
-        progresso = f"Capturando {len(self._captured)}/{ENROLL_FRAMES}"
+        progresso = t("Capturando {feitas}/{total}").format(
+            feitas=len(self._captured), total=ENROLL_FRAMES
+        )
         draw_centered_text(
             frame, progresso, frame.shape[1] // 2, int(40 * scale), 0.6 * scale, COLOR_ACCENT
         )
-        self._add_button(frame, "cancel", "Cancelar", scale, bottom=True)
+        self._add_button(frame, "cancel", t("Cancelar"), scale, bottom=True)
 
         if len(self._captured) >= ENROLL_FRAMES:
             self._finish_enrollment()
@@ -288,7 +297,11 @@ class FaceId(Mode):
         except (FaceDBError, ValueError) as error:
             self._notify(str(error))
         else:
-            self._notify(f"'{nome}' cadastrado a partir de {len(self._captured)} capturas.")
+            self._notify(
+                t("'{nome}' cadastrado a partir de {n} capturas.").format(
+                    nome=nome, n=len(self._captured)
+                )
+            )
         self._captured.clear()
         self._typed = ""
         self.stage = Stage.RECOGNIZING
@@ -299,7 +312,7 @@ class FaceId(Mode):
         x, y, width, height = face.box
         cor = COLOR_ACCENT if (nome or capturing) else COLOR_MUTED
         cv2.rectangle(frame, (x, y), (x + width, y + height), cor, max(2, int(2 * scale)))
-        rotulo = nome or UNKNOWN_NAME
+        rotulo = nome or t(UNKNOWN_NAME)
         if not capturing and nome:
             rotulo = f"{rotulo}  ({distancia:.2f})"
         draw_text(
@@ -322,10 +335,9 @@ class FaceId(Mode):
         self._buttons.append((rect, action))
 
     def _draw_actions(self, frame, scale: float) -> None:
-        self._add_button(frame, "enroll", "Cadastrar rosto", scale, bottom=True, index=0)
-        self._add_button(
-            frame, "manage", f"Gerenciar ({len(self.db)})", scale, bottom=True, index=1
-        )
+        self._add_button(frame, "enroll", t("Cadastrar rosto"), scale, bottom=True, index=0)
+        gerenciar = t("Gerenciar ({n})").format(n=len(self.db))
+        self._add_button(frame, "manage", gerenciar, scale, bottom=True, index=1)
 
     def _dialog_rect(self, frame, scale: float, lines: int) -> Rect:
         height, width = frame.shape[:2]
@@ -340,7 +352,7 @@ class FaceId(Mode):
         centro = painel.center[0]
         draw_centered_text(
             frame,
-            CONSENT_TITLE,
+            t(CONSENT_TITLE),
             centro,
             painel.y + int(30 * scale),
             0.6 * scale,
@@ -351,7 +363,7 @@ class FaceId(Mode):
         for linha in CONSENT_LINES:
             draw_text(
                 frame,
-                linha,
+                t(linha),
                 (painel.x + int(20 * scale), y),
                 0.42 * scale,
                 COLOR_TEXT,
@@ -363,8 +375,8 @@ class FaceId(Mode):
         botao_y = painel.bottom - int(44 * scale)
         aceitar = Rect(centro - largura - int(8 * scale), botao_y, largura, int(32 * scale))
         cancelar = Rect(centro + int(8 * scale), botao_y, int(140 * scale), int(32 * scale))
-        draw_button(frame, aceitar, CONSENT_ACCEPT, scale, hovered=self._hovered == "accept")
-        draw_button(frame, cancelar, CONSENT_CANCEL, scale, hovered=self._hovered == "cancel")
+        draw_button(frame, aceitar, t(CONSENT_ACCEPT), scale, hovered=self._hovered == "accept")
+        draw_button(frame, cancelar, t(CONSENT_CANCEL), scale, hovered=self._hovered == "cancel")
         self._buttons += [(aceitar, "accept"), (cancelar, "cancel")]
 
     def _draw_naming(self, frame, scale: float) -> None:
@@ -374,7 +386,7 @@ class FaceId(Mode):
         centro = painel.center[0]
         draw_centered_text(
             frame,
-            "Nome de quem está sendo cadastrado",
+            t("Nome de quem está sendo cadastrado"),
             centro,
             painel.y + int(34 * scale),
             0.55 * scale,
@@ -398,7 +410,7 @@ class FaceId(Mode):
         )
         draw_centered_text(
             frame,
-            "Enter confirma  •  ESC cancela",
+            t("Enter confirma  •  ESC cancela"),
             centro,
             painel.bottom - int(18 * scale),
             0.42 * scale,
@@ -413,7 +425,7 @@ class FaceId(Mode):
         centro = painel.center[0]
         draw_centered_text(
             frame,
-            "Rostos cadastrados",
+            t("Rostos cadastrados"),
             centro,
             painel.y + int(30 * scale),
             0.6 * scale,
@@ -433,13 +445,13 @@ class FaceId(Mode):
             )
             botao = Rect(painel.right - int(120 * scale), y, int(96 * scale), int(26 * scale))
             acao = f"delete:{nome}"
-            draw_button(frame, botao, "Excluir", scale, hovered=self._hovered == acao)
+            draw_button(frame, botao, t("Excluir"), scale, hovered=self._hovered == acao)
             self._buttons.append((botao, acao))
             y += int(34 * scale)
         if not nomes:
             draw_centered_text(
                 frame,
-                "Nenhum rosto cadastrado",
+                t("Nenhum rosto cadastrado"),
                 centro,
                 y + int(16 * scale),
                 0.5 * scale,
@@ -452,7 +464,7 @@ class FaceId(Mode):
             int(120 * scale),
             int(30 * scale),
         )
-        draw_button(frame, voltar, "Voltar", scale, hovered=self._hovered == "back")
+        draw_button(frame, voltar, t("Voltar"), scale, hovered=self._hovered == "back")
         self._buttons.append((voltar, "back"))
 
     def _draw_message(self, frame, scale: float) -> None:

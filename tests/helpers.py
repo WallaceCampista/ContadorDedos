@@ -47,7 +47,9 @@ def make_hand(
     if len(fingers) != len(FINGER_TIP_IDS):
         raise ValueError(f"Esperava {len(FINGER_TIP_IDS)} dedos, recebi {len(fingers)}.")
 
-    side = 1 if handedness == "Right" else -1
+    # O rótulo é a APARÊNCIA na imagem: uma mão que aparece como direita tem
+    # o polegar do lado esquerdo dela (X menor).
+    side = -1 if handedness == "Right" else 1
     wrist_x, wrist_y = _WRIST_XY
     points = [(0, 0)] * LANDMARK_COUNT
     points[0] = _WRIST_XY

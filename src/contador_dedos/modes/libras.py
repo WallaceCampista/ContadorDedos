@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 from ..core.overlay import draw_hand_landmarks
 from ..core.pipeline import ValueSmoother
+from ..i18n import t
 from ..ui.widgets import draw_hand_readout
 from ..vision.hands import HandTracker, real_hand
 from ..vision.handshape import fingers_extended
@@ -39,7 +40,7 @@ class LibrasNumber:
     @property
     def label(self) -> str:
         """O texto mostrado na tela: o algarismo e o nome por extenso."""
-        return f"{self.value} · {self.word}"
+        return f"{self.value} · {t(self.word)}"
 
 
 #: Numerais cobertos, na variante mais difundida de Libras.
@@ -106,8 +107,8 @@ class LibrasNumbers(Mode):
             frame,
             suavizado,
             self._mirrored,
-            caption=COVERAGE_CAPTION,
-            empty_message="Mostre a mão para a câmera",
+            caption=t(COVERAGE_CAPTION),
+            empty_message=t("Mostre a mão para a câmera"),
         )
         return frame
 

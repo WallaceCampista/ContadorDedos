@@ -19,6 +19,8 @@ COLOR_OUTLINE = (0, 0, 0)
 COLOR_HINT = (200, 200, 200)
 COLOR_MUTED = (160, 158, 155)
 COLOR_TOTAL = (0, 0, 255)
+#: Vermelho do indicador de gravação.
+COLOR_RECORDING = (60, 60, 255)
 
 # --- Superfícies ---
 COLOR_PANEL = (26, 24, 22)

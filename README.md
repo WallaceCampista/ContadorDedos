@@ -14,6 +14,8 @@
   - [Reconhecimento de gestos](#reconhecimento-de-gestos)
   - [Números em Libras](#numeros-em-libras)
   - [Identificação por rosto](#identificacao-por-rosto)
+  - [Snapshots e gravação](#snapshots-e-gravacao)
+  - [Idioma e som](#idioma-e-som)
   - [Contagem de Dedos](#contagem-de-dedos)
   - [Visualização em Tempo Real](#visualizacao-em-tempo-real)
 - [Tecnologias Utilizadas](#tecnologias-utilizadas)
@@ -66,6 +68,8 @@ registrados, então cada funcionalidade nova ganha o seu card automaticamente.
 |------|------|
 | Abrir um modo | Clique no card ou aperte o número dele |
 | Voltar ao menu | **ESC** ou o botão **← Voltar** no rodapé |
+| Salvar um snapshot | **S** |
+| Gravar vídeo | **R** (aperte de novo para parar) |
 | Encerrar | **Q**, o card **Sair**, ou fechando a janela |
 
 O card sob o mouse fica destacado, e o rodapé mostra sempre os atalhos
@@ -126,22 +130,40 @@ o que é guardado, onde e como excluir. Depois vêm o nome e a captura de 12
 quadros, cuja média vira o vetor salvo. O botão **Gerenciar** lista quem está
 cadastrado e permite **excluir** a qualquer momento.
 
-> **Primeira abertura baixa ~122 MB.** O detector de rosto (224 KB) e o modelo
-> ArcFace vêm sob demanda, só quando você entra neste modo — quem não usa não
-> paga o download. O pacote do ArcFace é descartado depois da extração; ficam
-> ~14 MB em disco.
+> **Modelos.** O detector de rosto (224 KB) e o ArcFace (~122 MB de download,
+> ~14 MB em disco depois da extração) já vêm no `setup.sh`. Se você pulou com
+> `--skip-models`, eles são baixados na primeira vez que este modo abrir — e aí
+> a janela fica parada durante o download.
 
 Se o reconhecimento errar, ajuste `--face-threshold`: **menor = mais rigor**
 (mais `Desconhecido`, menos confusão entre pessoas parecidas).
 
 ### Contagem de Dedos:
 Conta o número de dedos estendidos para cada mão (esquerda e direita) e exibe o total.
-O código verifica a posição da ponta de cada dedo (pontos 8, 12, 16 e 20) em relação à sua articulação PIP (pontos 6, 10, 14 e 18, respectivamente).
-Se a ponta estiver acima da articulação, o dedo é considerado levantado.
-O polegar (ponto 4) é tratado de forma diferente, comparando sua posição horizontal — por isso depende de saber qual é a mão.
 
-A **lateralidade** vem do classificador do próprio MediaPipe, e não de uma heurística geométrica: o rótulo continua correto mesmo com a mão girada ou de costas.
-A contagem também passa por uma **suavização anti-flicker** (o valor mais frequente dos últimos frames), para o número não tremer entre um quadro e outro.
+Os **quatro dedos longos** usam a ponta (pontos 8, 12, 16 e 20) contra a própria
+articulação PIP (pontos 6, 10, 14 e 18): ponta acima da articulação significa
+dedo levantado.
+
+O **polegar** precisa de outra régua, porque ele se abre para o lado em vez de
+para cima. A conta compara a distância da **ponta** e da **base** do polegar até
+a base do dedo mínimo — o ponto da palma mais afastado dele. Recolher o polegar
+leva a ponta na direção do mínimo e encurta essa distância; abrir, alonga.
+
+> Medir da base à ponta importa: a versão anterior comparava a ponta com a
+> articulação vizinha, e nessa distância curta um polegar levantado *junto* dos
+> dedos (em vez de aberto de lado) deixava só uns 5 px de diferença — ruído
+> suficiente para a mão aberta contar 4. Da base à ponta o segmento é umas três
+> vezes maior.
+
+A **lateralidade** vem do classificador do MediaPipe e serve para escolher em
+qual painel a contagem entra; **a contagem em si não depende dela**. Uma sutileza
+que vale registrar: o rótulo descreve a mão *como ela aparece na imagem*, então
+com o espelho ligado a sua mão direita aparece como uma esquerda — o app faz essa
+conversão antes de exibir.
+
+A contagem também passa por uma **suavização anti-flicker** (o valor mais
+frequente dos últimos frames), para o número não tremer entre um quadro e outro.
 
 ### Visualização em Tempo Real:
 Desenha os pontos de referência (landmarks) das mãos e exibe os contadores na tela.
@@ -163,9 +185,11 @@ qualquer webcam.
 
 - ONNX Runtime: Executa o modelo ArcFace do reconhecimento facial.
 
+- sounddevice: Toca o feedback sonoro opcional (`--sound`).
+
 - MediaPipe (Tasks API): Estrutura de aprendizado de máquina para detecção e rastreamento de mãos, via `HandLandmarker`.
 
-> A partir do MediaPipe 0.10.35 a API legada `mp.solutions` foi removida. O projeto usa a **Tasks API**, que depende do modelo `hand_landmarker.task` (~7,5 MB) — baixado automaticamente pelo `setup.sh` ou na primeira execução, e mantido fora do versionamento.
+> A partir do MediaPipe 0.10.35 a API legada `mp.solutions` foi removida. O projeto usa a **Tasks API**, que depende de arquivos de modelo que não vêm no wheel — baixados pelo `setup.sh` (ou sob demanda), verificados por SHA-256 e mantidos fora do versionamento.
 
 <br>
 
@@ -174,7 +198,7 @@ qualquer webcam.
 - Uma **webcam**
 - **Conexão com a internet** na primeira execução (para baixar o modelo de detecção)
 
-As dependências (OpenCV + MediaPipe) e o modelo de detecção são obtidos automaticamente pelo `setup.sh`.
+As dependências, as ferramentas de desenvolvimento e todos os modelos são obtidos automaticamente pelo `setup.sh`.
 
 <br>
 
@@ -182,7 +206,7 @@ As dependências (OpenCV + MediaPipe) e o modelo de detecção são obtidos auto
 
 ### ⚡ Setup automático (recomendado)
 
-O script [`setup.sh`](./setup.sh) **configura o ambiente com um único comando**: valida o Python, cria um ambiente virtual (`.venv`) e instala as dependências. Ele **não** abre a webcam — só prepara.
+O script [`setup.sh`](./setup.sh) **deixa tudo pronto em um comando**: valida o Python, cria o ambiente virtual (`.venv`), instala as dependências e as ferramentas de desenvolvimento, baixa **todos os modelos** e verifica que o app importa e que a câmera responde.
 
 ```bash
 git clone <url-do-repo>
@@ -193,12 +217,22 @@ cd ContadorDedos
 Acompanhe cada etapa com **barra de progresso e porcentagem**:
 
 ```
-[4/4] Modelo de detecção de mãos
+[5/5] Verificação
   ██████████████████████████████ 100%
 ```
 
-**Opções:** `./setup.sh --reinstall` (atualiza as dependências) · `./setup.sh -h` (ajuda).
-O script é **idempotente** — pode rodar de novo com segurança.
+**Opções:**
+
+| Flag | O que muda |
+|------|-----------|
+| `--no-dev` | Não instala pytest/ruff/black/pre-commit. |
+| `--skip-models` | Não baixa os modelos (~130 MB); o app os busca sob demanda. |
+| `--reinstall` | Reinstala as dependências. |
+| `-h` | Ajuda. |
+
+O script é **idempotente**: nada é rebaixado ou reinstalado à toa, então pode
+rodar de novo com segurança. Ele também detecta um `.venv` quebrado — o que
+acontece se a pasta do projeto for movida ou renomeada — e o recria.
 
 Depois de configurar, **execute** o app:
 
@@ -232,6 +266,9 @@ Todos os parâmetros têm um padrão sensato — rodar sem argumentos funciona. 
 | `--model ARQUIVO` | `models/hand_landmarker.task` | Caminho do modelo de mãos; baixado se estiver faltando. |
 | `--faces-db ARQUIVO` | `faces/faces.npz` | Base local de rostos cadastrados. |
 | `--face-threshold F` | `0.62` | Distância máxima para reconhecer um rosto; menor = mais rigor. |
+| `--output-dir PASTA` | `capturas/` | Onde salvar snapshots e gravações. |
+| `--lang pt\|en` | `pt` | Idioma da interface. |
+| `--sound` / `--no-sound` | `--no-sound` | Bipe ao mudar a contagem ou reconhecer alguém. |
 
 ```bash
 # Segunda câmera, uma mão só e sem espelhamento
@@ -240,6 +277,36 @@ Todos os parâmetros têm um padrão sensato — rodar sem argumentos funciona. 
 
 > O `setup.sh` instala o projeto em modo editável, então o comando
 > **`.venv/bin/contador-dedos`** também funciona — com as mesmas opções.
+
+<br>
+
+<h3 id="snapshots-e-gravacao">Snapshots e gravação</h3>
+
+Em qualquer tela, **S** salva um PNG e **R** liga/desliga a gravação em MP4. Os
+arquivos vão para `capturas/`, nomeados com data e hora — nada é sobrescrito.
+
+O que é salvo é **o que você vê**: landmarks, contadores e rodapé incluídos. A
+única exceção é o indicador `● Gravando`, desenhado depois de o frame ir para o
+arquivo — assim o vídeo sai limpo.
+
+```bash
+.venv/bin/python -m contador_dedos --output-dir ~/Desktop/capturas
+```
+
+<h3 id="idioma-e-som">Idioma e som</h3>
+
+A interface fala **português** e **inglês**:
+
+```bash
+.venv/bin/python -m contador_dedos --lang en
+```
+
+O nome do app permanece "Contador de Dedos" nos dois idiomas — é o nome do
+projeto, não um rótulo.
+
+O **feedback sonoro** (um bipe curto ao mudar a contagem ou reconhecer alguém)
+vem **desligado**; ligue com `--sound`. Em máquinas sem saída de áudio ele
+simplesmente não toca, sem atrapalhar o resto.
 
 <br>
 
@@ -309,11 +376,12 @@ O código é organizado em **camadas**, para que cada funcionalidade nova entre
 como um módulo plugável em vez de engordar um script único:
 
 - **`core/`** — infraestrutura: a câmera como *context manager*, o relógio do
-  vídeo e a anotação do frame.
+  vídeo, a anotação do frame, a captura (`recorder.py`) e o som (`audio.py`).
 - **`ui/`** — o tema (paleta e métricas), as primitivas de desenho (cards,
   painéis, botões) e o menu. Trocar a HighGUI por PySide6 mexeria só aqui.
 - **`vision/`** — a única camada que conhece o MediaPipe e o ArcFace, mais a
-  leitura geométrica da mão (`handshape.py`) que contagem e gestos compartilham.
+  leitura geométrica da mão (`handshape.py`) que contagem, gestos e Libras
+  compartilham.
 - **`storage/`** — a base local de rostos. Nenhuma chamada de rede aqui, por
   construção.
 - **`modes/`** — cada feature é um `Mode` (contagem, gestos e Libras hoje;
@@ -333,7 +401,8 @@ A estrutura de arquivos:
 │   ├── __main__.py       # python -m contador_dedos
 │   ├── app.py            # loop principal e roteamento entre telas
 │   ├── config.py         # AppConfig (dataclass) + CLI
-│   ├── core/             # câmera, relógio do vídeo e anotação do frame
+│   ├── i18n.py           # catálogo pt/en dos rótulos
+│   ├── core/             # câmera, relógio, anotação, captura e som
 │   ├── ui/               # tema, primitivas de desenho e a tela de menu
 │   ├── vision/           # MediaPipe, ArcFace e o download dos modelos
 │   ├── storage/          # base local de rostos (nunca versionada)
@@ -341,7 +410,7 @@ A estrutura de arquivos:
 ├── tests/                # suíte pytest (sem webcam, sem modelo, sem rede)
 ├── pyproject.toml        # metadados, dependências, entry point e config das ferramentas
 ├── .pre-commit-config.yaml
-├── setup.sh              # configura o ambiente (venv + dependências + modelo)
+├── setup.sh              # configura o ambiente inteiro (venv + deps + modelos)
 ├── requirements.txt      # aponta para o pyproject.toml
 ├── Plano_melhoria.md     # roteiro técnico de evolução do projeto
 ├── CONTRIBUTING.md       # como contribuir

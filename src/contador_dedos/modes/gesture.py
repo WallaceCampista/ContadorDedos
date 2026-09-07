@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from ..core.overlay import draw_hand_landmarks
 from ..core.pipeline import ValueSmoother
+from ..i18n import t
 from ..ui.widgets import UNKNOWN_VALUE, draw_hand_readout
 from ..vision.hands import HandTracker, real_hand
 from ..vision.handshape import fingers_extended, fingertips_touching, is_thumb_up
@@ -75,7 +76,7 @@ UNKNOWN_LABEL = UNKNOWN_VALUE
 
 def draw_gestures(img, leituras: dict[str, str | None], mirrored: bool = True) -> None:
     """Desenha o gesto reconhecido em cada mão."""
-    draw_hand_readout(img, leituras, mirrored, empty_message="Mostre a mão para a câmera")
+    draw_hand_readout(img, leituras, mirrored, empty_message=t("Mostre a mão para a câmera"))
 
 
 class GestureRecognizer(Mode):
@@ -105,7 +106,7 @@ class GestureRecognizer(Mode):
             draw_hand_landmarks(frame, hand.landmarks)
             points = landmarks_to_pixels(hand.landmarks, width, height)
             gesto = recognize_gesture(points, hand.handedness)
-            leituras[real_hand(hand.handedness, self._mirrored)] = gesto.label if gesto else None
+            leituras[real_hand(hand.handedness, self._mirrored)] = t(gesto.label) if gesto else None
 
         suavizado = {hand: self._smoothers[hand].update(valor) for hand, valor in leituras.items()}
         draw_gestures(frame, suavizado, self._mirrored)

@@ -57,12 +57,14 @@ class DetectedHand:
 def real_hand(handedness: str, mirrored: bool) -> str:
     """Converte o rótulo do MediaPipe na mão real da pessoa.
 
-    O MediaPipe assume imagem espelhada: com ``cv2.flip`` aplicado o rótulo já
-    corresponde à mão real; sem espelhamento, ele vem trocado.
+    O rótulo descreve a mão **como ela aparece na imagem**. Com ``cv2.flip``
+    aplicado, a aparência é o espelho da realidade — a mão direita de quem está
+    na frente da câmera aparece como uma mão esquerda —, então o rótulo precisa
+    ser trocado. Sem espelhamento, aparência e realidade coincidem.
     """
     if mirrored:
-        return handedness
-    return "Left" if handedness == "Right" else "Right"
+        return "Left" if handedness == "Right" else "Right"
+    return handedness
 
 
 class HandTracker:

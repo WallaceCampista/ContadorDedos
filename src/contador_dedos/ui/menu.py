@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import cv2
 
+from ..i18n import t
 from .theme import (
     CARD_GAP,
     CARD_HEIGHT,
@@ -102,7 +103,7 @@ class Menu:
         )
         draw_centered_text(
             frame,
-            SUBTITLE,
+            t(SUBTITLE),
             center_x,
             top - int(28 * scale),
             0.5 * scale,
@@ -112,7 +113,7 @@ class Menu:
 
         for index, (rect, entry) in enumerate(zip(self._rects, self.entries)):
             hovered = index == self.hovered
-            draw_card(frame, rect, entry.shortcut, entry.label, scale, hovered=hovered)
+            draw_card(frame, rect, entry.shortcut, t(entry.label), scale, hovered=hovered)
         return frame
 
     def on_mouse(self, event: int, x: int, y: int) -> None:

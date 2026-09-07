@@ -23,6 +23,8 @@ THUMB_MCP = 2
 INDEX_TIP = 8
 #: Bases do indicador e do médio, e o pulso — a régua da mão.
 INDEX_MCP, MIDDLE_MCP, WRIST = 5, 9, 0
+#: Base do mínimo — o ponto da palma mais distante do polegar.
+PINKY_MCP = 17
 
 #: Nomes dos dedos, na ordem em que ``fingers_extended`` os devolve.
 FINGER_NAMES = ("polegar", "indicador", "médio", "anelar", "mínimo")
