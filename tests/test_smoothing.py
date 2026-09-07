@@ -1,10 +1,11 @@
-"""Testes do anti-flicker e do medidor de FPS."""
+"""Testes do anti-flicker, do medidor de FPS e do relógio do vídeo."""
 
 from __future__ import annotations
 
 import pytest
 
-from contador_dedos import CountSmoother, FpsMeter
+from contador_dedos.core.pipeline import FpsMeter, VideoClock
+from contador_dedos.modes.finger_counter import CountSmoother
 
 
 def test_janela_precisa_ser_positiva():
@@ -71,3 +72,31 @@ def test_fps_ignora_ticks_sem_tempo_decorrido():
     meter.tick(1.0)
     meter.tick(1.5)
     assert meter.tick(1.5) == pytest.approx(2.0)  # inalterado, sem divisão por zero
+
+
+def test_relogio_comeca_no_zero():
+    assert VideoClock(started=0.0).tick(0.0) == 0
+
+
+def test_relogio_converte_segundos_em_milissegundos():
+    clock = VideoClock(started=0.0)
+    assert clock.tick(0.5) == 500
+    assert clock.tick(1.25) == 1250
+
+
+def test_relogio_nunca_repete_o_mesmo_timestamp():
+    """O modo de vídeo do MediaPipe rejeita timestamps que não avançam."""
+    clock = VideoClock(started=0.0)
+    # Vários quadros dentro do mesmo milissegundo: um loop rápido faz isso.
+    marcas = [clock.tick(0.0) for _ in range(5)]
+    assert marcas == [0, 1, 2, 3, 4]
+
+
+def test_relogio_avanca_mesmo_se_o_tempo_andar_para_tras():
+    clock = VideoClock(started=0.0)
+    primeiro = clock.tick(1.0)
+    assert clock.tick(0.5) > primeiro
+
+
+def test_relogio_usa_o_relogio_real_por_padrao():
+    assert VideoClock().tick() >= 0

@@ -43,8 +43,8 @@ cd ContadorDedos
 Executando o app:
 
 ```bash
-.venv/bin/python src/contador_dedos.py
-# ou: source .venv/bin/activate && python src/contador_dedos.py
+.venv/bin/python -m contador_dedos
+# ou: source .venv/bin/activate && python -m contador_dedos
 ```
 
 Para desenvolver, instale também as ferramentas de qualidade e ative os hooks:
@@ -89,6 +89,10 @@ prioriza uma stack enxuta.
 4. **Adicione testes** para a lógica nova. A regra é manter a lógica pura
    separada da câmera, para que ela seja testável sem hardware — veja
    `tests/helpers.py`, que monta mãos sintéticas.
+
+   Uma funcionalidade nova normalmente é um **`Mode`**: crie a subclasse em
+   `src/contador_dedos/modes/` e registre a fábrica em `modes/__init__.py`. O
+   loop principal não precisa mudar.
 5. **Teste manualmente** com a webcam também: nenhum teste cobre o loop de vídeo.
 6. Abra o **Pull Request** para `development`, preenchendo o template.
 

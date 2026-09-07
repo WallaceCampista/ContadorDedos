@@ -26,7 +26,7 @@ body:
       label: Passos para reproduzir
       description: O passo a passo mínimo para o bug aparecer.
       placeholder: |
-        1. Rodar `.venv/bin/python src/contador_dedos.py`
+        1. Rodar `.venv/bin/python -m contador_dedos`
         2. Mostrar a mão esquerda aberta para a webcam
         3. Fechar todos os dedos menos o polegar
         4. O número exibido não muda

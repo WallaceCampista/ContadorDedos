@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from contador_dedos import FINGER_TIP_IDS, PIP_OFFSET, THUMB_IP, THUMB_TIP
-
-#: Quantidade de landmarks que o MediaPipe devolve por mão.
-LANDMARK_COUNT = 21
+from contador_dedos.vision.landmarks import (
+    FINGER_TIP_IDS,
+    LANDMARK_COUNT,
+    PIP_OFFSET,
+    THUMB_IP,
+    THUMB_TIP,
+)
 
 
 def make_hand(

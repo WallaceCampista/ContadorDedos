@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from contador_dedos import DEFAULT_MODEL_PATH, AppConfig, parse_args, should_quit
+from contador_dedos.app import should_quit
+from contador_dedos.config import DEFAULT_MODEL_PATH, AppConfig, parse_args
 
 
 def test_sem_argumentos_usa_os_padroes():

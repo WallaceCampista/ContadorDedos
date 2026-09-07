@@ -404,7 +404,7 @@ O modo de face **só é aceitável** com estas garantias:
    A migração para `pyproject.toml` fica para a Fase 2, junto com o entry point.
 3. ✅ Adicionar `CONTRIBUTING.md` e templates `.github/` (bug, feature, PR).
 
-> **Próxima fase:** [Fase 3 — Arquitetura modular](#fase-3--arquitetura-modular-habilitadora).
+> **Próxima fase:** [Fase 4 — Interface interativa](#fase-4--interface-interativa-uiux).
 
 ### Fase 1 — Correção e refatoração do núcleo (P0 + P1) — ✅ **concluída**
 
@@ -478,10 +478,66 @@ de execução. A contrapartida: `typing.get_type_hints()` sobre essas funções
 falharia no 3.9. Nada no projeto faz isso, mas vale saber antes de introduzir
 alguma ferramenta que inspecione tipos em runtime.
 
-### Fase 3 — Arquitetura modular (habilitadora)
-Migrar para a estrutura de pacote da [Seção 3](#3-arquitetura-alvo): `Mode` (ABC),
-registro de modos, `core/camera.py` como context manager, `config.py`, camada
-`vision/`. **Sem mudar comportamento** — é a fundação para o menu e a face.
+### Fase 3 — Arquitetura modular (habilitadora) — ✅ **concluída**
+
+O módulo único virou o pacote da [Seção 3](#3-arquitetura-alvo), **sem mudar o
+comportamento**: o HUD, os atalhos e a contagem continuam idênticos.
+
+```
+src/contador_dedos/
+├── __init__.py            # fachada: reexporta main/App/AppConfig
+├── __main__.py            # python -m contador_dedos
+├── app.py                 # App: loop, roteamento de telas, teclas
+├── config.py              # AppConfig (dataclass) + parse_args
+├── core/
+│   ├── camera.py          # Camera: context manager, espelho, tolerância a falhas
+│   ├── pipeline.py        # VideoClock (timestamps crescentes) + FpsMeter
+│   ├── theme.py           # paleta, fonte e escala do HUD
+│   └── overlay.py         # draw_text, draw_hand_landmarks, draw_status_bar
+├── vision/
+│   ├── hands.py           # HandTracker: wrapper da Tasks API + real_hand
+│   ├── landmarks.py       # constantes e conversão para pixels
+│   └── model.py           # download genérico com SHA-256 e escrita atômica
+└── modes/
+    ├── base.py            # Mode (ABC): process / on_mouse / close
+    ├── finger_counter.py  # a contagem (lógica pura) + sua apresentação
+    └── __init__.py        # MODE_FACTORIES: o registro
+```
+
+**O que a fase destravou:**
+- **`Mode` (ABC) + registro.** Acrescentar uma feature é criar a subclasse e
+  somar uma linha em `MODE_FACTORIES`. O `app.py` não conhece contagem de dedos
+  — só o contrato.
+- **`Camera` como context manager**, com espelhamento e tolerância a frames
+  vazios encapsulados; o loop ficou livre desse ruído.
+- **`vision/` isolado.** É a fronteira que faltava quando `mp.solutions` sumiu
+  na Fase 1: agora uma troca de biblioteca mexe em um diretório só.
+- **`VideoClock`.** A regra "timestamps estritamente crescentes" do modo de
+  vídeo virou uma classe testável, em vez de duas linhas fáceis de errar no
+  meio do loop.
+- **`download_model(destino, url, sha256)` genérico**, para a Fase 6 reusá-lo
+  no modelo de rosto sem copiar código.
+- **Barra de status no `app.py`**, não mais no modo: FPS e atalhos passam a ser
+  responsabilidade da moldura, como a [Seção 4.4](#44-refino-de-uiux-dos-modos-aplica-se-a-todos) pede.
+
+**Testes:** 115 (eram 78). Os novos cobrem `Camera` (com uma `VideoCapture` de
+mentira), `VideoClock`, o contrato `Mode`, o registro e o roteamento do `App`.
+
+> **Execução.** Como `src/contador_dedos.py` virou um diretório, o comando passa
+> a ser **`python -m contador_dedos`** (ou `contador-dedos`). O entry point não
+> mudou — o `__init__.py` reexporta `main`, exatamente como a Fase 2 previu.
+
+> **Bug corrigido de tabela.** A renomeação da Fase 2 deixou para trás um
+> `import main` no `setup.sh`, no ramo que baixa o modelo. O ramo só roda quando
+> o modelo está ausente, então ninguém tinha esbarrado nele. Agora o script
+> chama `ensure_hand_model(DEFAULT_MODEL_PATH)`, e esse caminho foi testado com
+> o modelo removido de propósito.
+
+**Fora do escopo desta fase:** `ui/` (menu, widgets) fica para a Fase 4, e
+`storage/` (base de rostos) para a Fase 6. O modelo continua em `models/` na
+raiz, e não em `storage/models/` como a Seção 3.2 desenha — escrever dentro do
+pacote só funcionaria por causa do install editável, e a raiz é o lugar certo
+para um artefato baixado em tempo de execução.
 
 ### Fase 4 — Interface interativa (UI/UX)
 Implementar o **menu clicável** ([Seção 4](#4-interface-interativa-uiux)) em
@@ -538,8 +594,11 @@ garantias de privacidade. Entregar com testes da camada de `FaceDB` (match/delet
    A CI não precisa do modelo: os testes cobrem só lógica pura. Ela instala,
    isso sim, `libgl1`/`libglib2.0-0` no runner — o wheel do `opencv-python`
    (não-headless) linka libGL e o `import cv2` falharia sem elas.
-5. **Fase 3 (arquitetura modular)** — é a fundação; sem ela, menu e face viram gambiarra.
+5. ~~**Fase 3 (arquitetura modular)** — é a fundação; sem ela, menu e face viram gambiarra.~~ ✅
 6. **Fase 4 (menu clicável)** — entrega a experiência "escolha o que fazer".
+   O terreno está pronto: `Mode.name`/`icon` alimentam os cards, `Mode.on_mouse`
+   recebe os cliques, `App.screen` já é a tela corrente e `App.handle_key` é
+   onde o ESC passa a voltar ao menu em vez de encerrar.
 7. Só então **gestos (Fase 5)** e **face (Fase 6)**, uma feature por PR, cada uma como um `Mode` com testes.
 
 > **Princípios:** (1) estabilizar e testar o núcleo antes de expandir;

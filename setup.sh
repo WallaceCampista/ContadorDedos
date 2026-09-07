@@ -100,8 +100,8 @@ trap 'echo; print_error "Setup interrompido (linha $LINENO). Corrija o problema 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-if [ ! -f "src/contador_dedos.py" ]; then
-    print_error "Rode este script na raiz do projeto Contador de Dedos (src/contador_dedos.py não encontrado)."
+if [ ! -f "src/contador_dedos/__init__.py" ]; then
+    print_error "Rode este script na raiz do projeto Contador de Dedos (src/contador_dedos/ não encontrado)."
     exit 1
 fi
 
@@ -187,14 +187,14 @@ progress_header "Modelo de detecção de mãos"
 
 # O MediaPipe 0.10.35 removeu a API legada `mp.solutions`; a Tasks API que a
 # substituiu precisa do arquivo de modelo, que não vem no wheel. O download (e a
-# verificação de integridade) mora no próprio src/contador_dedos.py, para que a URL
+# verificação de integridade) mora em contador_dedos/vision/, para que a URL
 # hash tenham um único dono — e para que rodar o app sem o setup.sh também
 # funcione.
 MODEL_FILE="models/hand_landmarker.task"
 
 if [ -f "$MODEL_FILE" ]; then
     print_success "Modelo já baixado ($MODEL_FILE)"
-elif "$VENV_PY" -c "import sys; sys.path.insert(0, 'src'); import main; main.ensure_model(main.DEFAULT_MODEL_PATH)"; then
+elif "$VENV_PY" -c "from contador_dedos.config import DEFAULT_MODEL_PATH; from contador_dedos.vision.hands import ensure_hand_model; ensure_hand_model(DEFAULT_MODEL_PATH)"; then
     print_success "Modelo baixado em $MODEL_FILE"
 else
     print_error "Falha ao baixar o modelo de detecção de mãos."
@@ -215,10 +215,10 @@ echo ""
 
 echo "Para executar (abre a webcam):"
 echo ""
-echo -e "  ${GREEN}${VENV_BIN}/python src/contador_dedos.py${NC}"
+echo -e "  ${GREEN}${VENV_BIN}/python -m contador_dedos${NC}"
 echo ""
 print_info "Ou use o comando instalado: ${GREEN}${VENV_BIN}/contador-dedos${NC}"
-print_info "Ative o ambiente com:  ${GREEN}source ${VENV_BIN}/activate${NC}  (depois: ${GREEN}python src/contador_dedos.py${NC})"
+print_info "Ative o ambiente com:  ${GREEN}source ${VENV_BIN}/activate${NC}  (depois: ${GREEN}python -m contador_dedos${NC})"
 if [ "$PLATFORM" = "macos" ]; then
     print_info "No macOS, autorize a câmera para o seu terminal em Ajustes > Privacidade e Segurança > Câmera."
 fi

@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "contador-dedos"
-version = "0.2.0"
+version = "0.3.0"
 description = "Conta os dedos levantados em tempo real usando a webcam, com OpenCV e MediaPipe."
 readme = "README.md"
 license = "MIT"
@@ -49,13 +49,8 @@ Repository = "https://github.com/WallaceCampista/ContadorDedos"
 [project.scripts]
 contador-dedos = "contador_dedos:main"
 
-[tool.setuptools]
-# Módulo único por enquanto; a Fase 3 o transforma no pacote `contador_dedos/`
-# sem que o entry point acima precise mudar.
-py-modules = ["contador_dedos"]
-
-[tool.setuptools.package-dir]
-"" = "src"
+[tool.setuptools.packages.find]
+where = ["src"]
 
 # ------------------------------------------------------------------------------
 # Qualidade

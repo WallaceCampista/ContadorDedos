@@ -95,10 +95,10 @@ O script é **idempotente** — pode rodar de novo com segurança.
 Depois de configurar, **execute** o app:
 
 ```bash
-.venv/bin/python src/contador_dedos.py
+.venv/bin/python -m contador_dedos
 # ou, ativando o ambiente:
 source .venv/bin/activate
-python src/contador_dedos.py
+python -m contador_dedos
 ```
 
 A janela da sua webcam será aberta e o programa começará a detectar suas mãos e contar os dedos em tempo real. Encerre com **Q** ou **ESC** na janela (ou fechando-a).
@@ -123,7 +123,7 @@ Todos os parâmetros têm um padrão sensato — rodar sem argumentos funciona. 
 
 ```bash
 # Segunda câmera, uma mão só e sem espelhamento
-.venv/bin/python src/contador_dedos.py --camera 1 --max-hands 1 --no-mirror
+.venv/bin/python -m contador_dedos --camera 1 --max-hands 1 --no-mirror
 ```
 
 > O `setup.sh` instala o projeto em modo editável, então o comando
@@ -163,7 +163,7 @@ A [CI](.github/workflows/ci.yml) repete esses três checks em uma matriz de
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install --no-compile -r requirements.txt
-python src/contador_dedos.py
+python -m contador_dedos
 ```
 
 > **Por que `--no-compile`?** O wheel do MediaPipe 0.10.35 traz um arquivo de teste com um caractere inválido (`∂`). No Python 3.9 do macOS (locale sem UTF-8), a etapa de compilação de bytecode do pip estoura e aborta toda a instalação. A flag `--no-compile` pula essa etapa — os `.pyc` são gerados sob demanda no import e o app funciona normalmente.
@@ -173,7 +173,18 @@ python src/contador_dedos.py
 <br>
 
 ## Arquitetura do Projeto
-A estrutura do projeto é simples e organizada da seguinte forma:
+O código é organizado em **camadas**, para que cada funcionalidade nova entre
+como um módulo plugável em vez de engordar um script único:
+
+- **`core/`** — infraestrutura: a câmera como *context manager*, o relógio do
+  vídeo, o tema e os helpers de desenho.
+- **`vision/`** — a única camada que conhece o MediaPipe. Trocar ou atualizar a
+  biblioteca mexe só aqui.
+- **`modes/`** — cada feature é um `Mode` (contagem de dedos hoje; gestos e
+  rosto adiante). Adicionar uma = criar a classe e registrá-la.
+- **`app.py`** — o loop, que conhece apenas o contrato `Mode`.
+
+A estrutura de arquivos:
 
 ```
 ├── .github
@@ -181,8 +192,13 @@ A estrutura do projeto é simples e organizada da seguinte forma:
 │   ├── workflows/ci.yml  # lint + testes em Python 3.9–3.12
 │   └── pull_request_template.md
 ├── models/               # hand_landmarker.task (baixado, fora do versionamento)
-├── src
-│   └── contador_dedos.py # lógica de contagem (pura) + captura, desenho e CLI
+├── src/contador_dedos/
+│   ├── __main__.py       # python -m contador_dedos
+│   ├── app.py            # loop principal e roteamento entre telas
+│   ├── config.py         # AppConfig (dataclass) + CLI
+│   ├── core/             # câmera, relógio do vídeo, tema e desenho
+│   ├── vision/           # tudo que fala com o MediaPipe (+ download do modelo)
+│   └── modes/            # features plugáveis: base.py (ABC) e finger_counter.py
 ├── tests/                # suíte pytest (sem webcam, sem modelo, sem rede)
 ├── pyproject.toml        # metadados, dependências, entry point e config das ferramentas
 ├── .pre-commit-config.yaml

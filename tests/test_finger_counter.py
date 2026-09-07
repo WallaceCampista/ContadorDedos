@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from contador_dedos import count_fingers, is_thumb_extended, real_hand
-from helpers import LANDMARK_COUNT, make_hand
+from contador_dedos.modes.finger_counter import count_fingers, is_thumb_extended
+from contador_dedos.vision.hands import real_hand
+from contador_dedos.vision.landmarks import LANDMARK_COUNT
+from helpers import make_hand
 
 HANDS = ("Left", "Right")
 
