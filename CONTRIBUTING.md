@@ -92,7 +92,8 @@ prioriza uma stack enxuta.
 
    Uma funcionalidade nova normalmente é um **`Mode`**: crie a subclasse em
    `src/contador_dedos/modes/` e registre a fábrica em `modes/__init__.py`. O
-   loop principal não precisa mudar.
+   loop principal não precisa mudar — e o card no menu, com atalho de teclado,
+   aparece sozinho a partir do `name` do modo.
 5. **Teste manualmente** com a webcam também: nenhum teste cobre o loop de vídeo.
 6. Abra o **Pull Request** para `development`, preenchendo o template.
 

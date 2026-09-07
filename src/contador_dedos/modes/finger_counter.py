@@ -9,8 +9,9 @@ from __future__ import annotations
 from collections import Counter, deque
 from collections.abc import Sequence
 
-from ..core.overlay import draw_hand_landmarks, draw_text, hud_scale
-from ..core.theme import COLOR_TEXT, COLOR_TOTAL
+from ..core.overlay import draw_hand_landmarks
+from ..ui.theme import COLOR_MUTED, COLOR_TEXT, COLOR_TOTAL
+from ..ui.widgets import Rect, draw_centered_text, draw_panel, draw_text, hud_scale
 from ..vision.hands import HandTracker, real_hand
 from ..vision.landmarks import (
     FINGER_TIP_IDS,
@@ -110,9 +111,10 @@ def draw_counter(
 
 
 def draw_counters(img, counts: dict[str, int | None], mirrored: bool) -> None:
-    """Desenha os contadores de cada mão e o total."""
+    """Desenha os contadores de cada mão e o total, sobre uma faixa legível."""
     height, width = img.shape[:2]
     scale = hud_scale(height)
+    draw_panel(img, Rect(0, 0, width, int(96 * scale)))
 
     # Cada painel fica do lado da tela em que aquela mão realmente aparece.
     left_hand, right_hand = ("Left", "Right") if mirrored else ("Right", "Left")
@@ -130,6 +132,23 @@ def draw_counters(img, counts: dict[str, int | None], mirrored: bool) -> None:
     total = sum(value for value in counts.values() if value is not None)
     draw_counter(img, "Total", total, width // 2 - int(30 * scale), scale, COLOR_TOTAL)
 
+    if all(value is None for value in counts.values()):
+        draw_empty_state(img, scale)
+
+
+def draw_empty_state(img, scale: float) -> None:
+    """Diz o que está acontecendo quando não há nada para contar."""
+    height, width = img.shape[:2]
+    draw_centered_text(
+        img,
+        "Nenhuma mão detectada",
+        width // 2,
+        height // 2,
+        0.6 * scale,
+        COLOR_MUTED,
+        max(1, int(scale)),
+    )
+
 
 # ---------------------------------------------------------------------------
 # O modo
@@ -141,7 +160,7 @@ class FingerCounter(Mode):
 
     name = "Contar Dedos"
     icon = "✋"
-    hint = "Q ou ESC para sair"
+    hint = "ESC volta ao menu  •  Q encerra"
 
     def __init__(self, tracker: HandTracker, mirrored: bool = True, smooth_window: int = 5) -> None:
         self._tracker = tracker

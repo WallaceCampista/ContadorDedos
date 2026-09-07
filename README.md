@@ -9,6 +9,7 @@
 ## Sumário
 - [Sobre o Projeto](#sobre-o-projeto)
 - [Funcionalidades](#funcionalidades)
+  - [Menu interativo](#menu-interativo)
   - [Detecção de Mãos](#detecao-de-maos)
   - [Contagem de Dedos](#contagem-de-dedos)
   - [Visualização em Tempo Real](#visualizacao-em-tempo-real)
@@ -29,6 +30,39 @@ Este projeto simples em Python utiliza as bibliotecas OpenCV e MediaPipe para de
 <br>
 
 ## Funcionalidades
+
+<h3 id="menu-interativo">Menu interativo</h3>
+
+O app abre em uma **tela inicial** onde você escolhe o que fazer — clicando em um
+card ou apertando a tecla que ele mostra. O menu é gerado a partir dos modos
+registrados, então cada funcionalidade nova ganha o seu card automaticamente.
+
+```
+┌──────────────────────────────────────────────────┐
+│                                                  │
+│                Contador de Dedos                 │
+│             Escolha o que deseja fazer           │
+│                                                  │
+│       ┌──────────────┐   ┌──────────────┐        │
+│       │      1       │   │      Q       │        │
+│       │ Contar Dedos │   │     Sair     │        │
+│       └──────────────┘   └──────────────┘        │
+│                                                  │
+│     Clique em um card  •  Q encerra    29.9 FPS  │
+└──────────────────────────────────────────────────┘
+```
+
+**Navegação:**
+
+| Ação | Como |
+|------|------|
+| Abrir um modo | Clique no card ou aperte o número dele |
+| Voltar ao menu | **ESC** ou o botão **← Voltar** no rodapé |
+| Encerrar | **Q**, o card **Sair**, ou fechando a janela |
+
+O card sob o mouse fica destacado, e o rodapé mostra sempre os atalhos
+disponíveis na tela atual.
+
 ### Detecção de Mãos:
 Identifica a presença de uma ou duas mãos no quadro da webcam.
 
@@ -46,7 +80,11 @@ Desenha os pontos de referência (landmarks) das mãos e exibe os contadores na 
 Os contadores de dedos para a mão esquerda, direita e o total são exibidos na tela da webcam em tempo real, junto de um **medidor de FPS** e da dica de atalhos no rodapé.
 
 A imagem é **espelhada** por padrão, como um espelho de verdade: sua mão direita aparece à direita da tela, e cada contador fica do lado em que aquela mão realmente aparece.
-Os textos têm contorno escuro e escalam com a resolução da câmera, para permanecerem legíveis em qualquer fundo e em qualquer webcam.
+Quando não há mão no quadro, a tela diz isso — em vez de mostrar zeros ambíguos.
+
+Os textos ficam sobre **faixas semitransparentes**, têm contorno escuro e escalam
+com a resolução da câmera, para permanecerem legíveis em qualquer fundo e em
+qualquer webcam.
 
 <br>
 
@@ -101,7 +139,8 @@ source .venv/bin/activate
 python -m contador_dedos
 ```
 
-A janela da sua webcam será aberta e o programa começará a detectar suas mãos e contar os dedos em tempo real. Encerre com **Q** ou **ESC** na janela (ou fechando-a).
+A janela da sua webcam abre no **menu**; clique em *Contar Dedos* (ou aperte `1`)
+para começar. **ESC** volta ao menu e **Q** encerra.
 
 > Se o modelo `hand_landmarker.task` ainda não estiver em `models/`, ele é baixado automaticamente nesta primeira execução.
 
@@ -177,7 +216,9 @@ O código é organizado em **camadas**, para que cada funcionalidade nova entre
 como um módulo plugável em vez de engordar um script único:
 
 - **`core/`** — infraestrutura: a câmera como *context manager*, o relógio do
-  vídeo, o tema e os helpers de desenho.
+  vídeo e a anotação do frame.
+- **`ui/`** — o tema (paleta e métricas), as primitivas de desenho (cards,
+  painéis, botões) e o menu. Trocar a HighGUI por PySide6 mexeria só aqui.
 - **`vision/`** — a única camada que conhece o MediaPipe. Trocar ou atualizar a
   biblioteca mexe só aqui.
 - **`modes/`** — cada feature é um `Mode` (contagem de dedos hoje; gestos e
@@ -196,7 +237,8 @@ A estrutura de arquivos:
 │   ├── __main__.py       # python -m contador_dedos
 │   ├── app.py            # loop principal e roteamento entre telas
 │   ├── config.py         # AppConfig (dataclass) + CLI
-│   ├── core/             # câmera, relógio do vídeo, tema e desenho
+│   ├── core/             # câmera, relógio do vídeo e anotação do frame
+│   ├── ui/               # tema, primitivas de desenho e a tela de menu
 │   ├── vision/           # tudo que fala com o MediaPipe (+ download do modelo)
 │   └── modes/            # features plugáveis: base.py (ABC) e finger_counter.py
 ├── tests/                # suíte pytest (sem webcam, sem modelo, sem rede)

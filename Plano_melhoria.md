@@ -404,7 +404,7 @@ O modo de face **só é aceitável** com estas garantias:
    A migração para `pyproject.toml` fica para a Fase 2, junto com o entry point.
 3. ✅ Adicionar `CONTRIBUTING.md` e templates `.github/` (bug, feature, PR).
 
-> **Próxima fase:** [Fase 4 — Interface interativa](#fase-4--interface-interativa-uiux).
+> **Próxima fase:** [Fase 5 — Modos de visão adicionais](#fase-5--modos-de-visão-adicionais).
 
 ### Fase 1 — Correção e refatoração do núcleo (P0 + P1) — ✅ **concluída**
 
@@ -539,10 +539,52 @@ raiz, e não em `storage/models/` como a Seção 3.2 desenha — escrever dentro
 pacote só funcionaria por causa do install editável, e a raiz é o lugar certo
 para um artefato baixado em tempo de execução.
 
-### Fase 4 — Interface interativa (UI/UX)
-Implementar o **menu clicável** ([Seção 4](#4-interface-interativa-uiux)) em
-OpenCV HighGUI: cards, hover, `setMouseCallback`, navegação ESC/Voltar, barra de
-status, tema centralizado e refino de legibilidade em todos os modos.
+### Fase 4 — Interface interativa (UI/UX) — ✅ **concluída**
+
+O app deixou de abrir direto na webcam: agora abre em um **menu clicável**, na
+mesma janela, com cards, hover e navegação de volta.
+
+```
+src/contador_dedos/ui/
+├── theme.py     # paleta, transparências e métricas
+├── widgets.py   # Rect, hit_test, draw_text/panel/card/button/status_bar
+└── menu.py      # a tela de menu (cumpre o mesmo contrato de um Mode)
+```
+
+**Entregue:**
+- ✅ **Cards clicáveis** com hover destacado, montados a partir do registro de
+  modos — um modo novo ganha card e atalho sem tocar na UI.
+- ✅ **`cv2.setMouseCallback`** no `App`, que só registra intenção; a troca de
+  tela acontece no loop, num ponto só.
+- ✅ **Navegação:** ESC e o botão **← Voltar** retornam ao menu; **Q** e o card
+  *Sair* encerram. No menu, ESC não faz nada — como a [Seção 4.1](#41-fluxo-de-navegação) descreve.
+- ✅ **Atalhos de teclado** documentados na própria tela: o card exibe a tecla
+  que o abre (`1`, `2`, …), o que resolve navegação e acessibilidade juntos.
+- ✅ **Barra de status** com botão de voltar, dica de atalhos e FPS.
+- ✅ **Tema centralizado** em `ui/theme.py`, com **faixas semitransparentes**
+  atrás do HUD e véu sobre a webcam no menu.
+- ✅ **Estado vazio:** "Nenhuma mão detectada", em vez de zeros ambíguos.
+
+**Testes:** 170 (eram 115). Os novos cobrem geometria e hit-testing, o menu
+(layout, hover, clique, atalhos) e o roteamento do `App`.
+
+> **Limitação da HighGUI que mudou o desenho.** `cv2.putText` usa fontes
+> Hershey: acentos e a seta `←` renderizam bem, mas **emoji não** — saem como
+> `?`. Os ícones do mockup da [Seção 4.2](#42-mockup-do-menu-inicial) (✋ 🤟 🙂)
+> foram substituídos pela **tecla de atalho** como âncora visual do card. O
+> `Mode.icon` continua existindo para um front-end futuro que renderize emoji.
+
+> **Bug de renderização corrigido.** O contorno do texto era feito desenhando-o
+> por baixo com traço mais grosso — e no OpenCV o glifo *alarga* junto com a
+> espessura (~16px a mais em um título). O contorno terminava depois do
+> preenchimento, deixando um rastro escuro à direita, visível desde a Fase 1 e
+> gritante nos textos grandes do menu. Agora o contorno repete o texto deslocado
+> nas 8 direções, com a **mesma** espessura. Há um teste que mede o vazamento.
+
+**Fora do escopo:** o card **Config** do mockup não foi incluído — não há tela de
+configuração para abrir, e um card que não faz nada é pior que a sua ausência.
+Os parâmetros seguem na CLI. Quando houver o que configurar, ele entra como
+qualquer outra entrada do menu.
 
 ### Fase 5 — Modos de visão adicionais
 - **Reconhecimento de gestos:** joinha 👍, "paz" ✌️, "OK" 👌, mão aberta/fechada.
@@ -595,10 +637,9 @@ garantias de privacidade. Entregar com testes da camada de `FaceDB` (match/delet
    isso sim, `libgl1`/`libglib2.0-0` no runner — o wheel do `opencv-python`
    (não-headless) linka libGL e o `import cv2` falharia sem elas.
 5. ~~**Fase 3 (arquitetura modular)** — é a fundação; sem ela, menu e face viram gambiarra.~~ ✅
-6. **Fase 4 (menu clicável)** — entrega a experiência "escolha o que fazer".
-   O terreno está pronto: `Mode.name`/`icon` alimentam os cards, `Mode.on_mouse`
-   recebe os cliques, `App.screen` já é a tela corrente e `App.handle_key` é
-   onde o ESC passa a voltar ao menu em vez de encerrar.
+6. ~~**Fase 4 (menu clicável)** — entrega a experiência "escolha o que fazer".~~ ✅
+   A aposta da Fase 3 se confirmou: o menu saiu sem tocar no loop, e um modo
+   novo agora custa uma classe e uma linha no registro.
 7. Só então **gestos (Fase 5)** e **face (Fase 6)**, uma feature por PR, cada uma como um `Mode` com testes.
 
 > **Princípios:** (1) estabilizar e testar o núcleo antes de expandir;

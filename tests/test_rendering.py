@@ -7,9 +7,9 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from contador_dedos.core.overlay import draw_status_bar, draw_text, hud_scale
-from contador_dedos.core.theme import COLOR_TOTAL, HUD_REFERENCE_HEIGHT, MIN_HUD_SCALE
 from contador_dedos.modes.finger_counter import draw_counters
+from contador_dedos.ui.theme import COLOR_TOTAL, HUD_REFERENCE_HEIGHT, MIN_HUD_SCALE
+from contador_dedos.ui.widgets import draw_status_bar, draw_text, hud_scale
 from contador_dedos.vision.landmarks import landmarks_to_pixels
 
 RESOLUCOES = [(320, 240), (640, 480), (1920, 1080)]
@@ -55,8 +55,8 @@ def test_contadores_ocupam_os_dois_lados_do_topo(width, height):
     """Desenhar fora do array não levanta erro no OpenCV — precisa ser conferido."""
     img = frame(width, height)
     draw_counters(img, {"Left": 5, "Right": 5}, True)
-    colunas = img.any(axis=(0, 2))
-    linhas = img.any(axis=(1, 2))
+    claro = img.max(axis=2) > 200  # só o texto branco/vermelho, não a faixa
+    colunas, linhas = claro.any(axis=0), claro.any(axis=1)
     assert colunas[: width // 3].any(), "nada desenhado à esquerda"
     assert colunas[-width // 3 :].any(), "nada desenhado à direita"
     assert linhas[: height // 4].any(), "contadores ausentes no topo"
@@ -72,7 +72,7 @@ def test_contadores_aceitam_mao_ausente():
 @pytest.mark.parametrize(("width", "height"), RESOLUCOES)
 def test_barra_de_status_fica_no_rodape(width, height):
     img = frame(width, height)
-    draw_status_bar(img, "Q ou ESC para sair", 12.3)
+    draw_status_bar(img, "ESC volta ao menu", 12.3)
     linhas = img.any(axis=(1, 2))
     assert linhas[-height // 8 :].any(), "rodapé ausente"
     assert not linhas[: height // 2].any(), "rodapé invadiu a metade de cima"
@@ -81,10 +81,27 @@ def test_barra_de_status_fica_no_rodape(width, height):
 def test_barra_de_status_mostra_fps_e_dica():
     """Os dois textos ficam em cantos opostos."""
     img = frame()
-    draw_status_bar(img, "Q ou ESC para sair", 30.0)
-    colunas = img.any(axis=(0, 2))
-    assert colunas[:200].any(), "FPS ausente à esquerda"
-    assert colunas[-200:].any(), "dica ausente à direita"
+    assert draw_status_bar(img, "ESC volta ao menu", 30.0) is None, "sem botão, sem retângulo"
+    claro = img.max(axis=2) > 150
+    colunas = claro.any(axis=0)
+    assert colunas[img.shape[1] // 3 : 2 * img.shape[1] // 3].any(), "dica ausente no centro"
+    assert colunas[-160:].any(), "FPS ausente à direita"
+
+
+def test_barra_de_status_devolve_a_area_do_botao_voltar():
+    """O `App` precisa do retângulo para testar o clique."""
+    img = frame()
+    rect = draw_status_bar(img, "dica", 30.0, back_label="← Voltar")
+    assert rect is not None
+    assert rect.x >= 0 and rect.bottom <= img.shape[0]
+    assert rect.contains(*rect.center)
+
+
+def test_botao_voltar_muda_de_aparencia_no_hover():
+    normal, destacado = frame(), frame()
+    draw_status_bar(normal, "dica", 30.0, back_label="← Voltar")
+    draw_status_bar(destacado, "dica", 30.0, back_label="← Voltar", back_hovered=True)
+    assert (normal != destacado).any(), "o hover precisa ser visível"
 
 
 def test_landmarks_para_pixels():

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from contador_dedos.app import should_quit
+from contador_dedos.app import KEY_BACK, is_printable, should_quit
 from contador_dedos.config import DEFAULT_MODEL_PATH, AppConfig, parse_args
 
 
@@ -91,6 +91,18 @@ def test_should_quit_por_letra(tecla, encerra):
     assert should_quit(ord(tecla)) is encerra
 
 
-def test_esc_encerra_e_tecla_ausente_nao():
-    assert should_quit(27) is True
+def test_esc_nao_encerra_mais():
+    """Desde a Fase 4, o ESC volta ao menu — quem encerra é o Q."""
+    assert should_quit(KEY_BACK) is False
+
+
+def test_tecla_ausente_nao_encerra():
     assert should_quit(255) is False  # waitKey sem tecla pressionada
+
+
+@pytest.mark.parametrize(
+    ("codigo", "imprimivel"),
+    [(ord("1"), True), (ord("z"), True), (255, False), (27, False), (10, False)],
+)
+def test_is_printable_filtra_o_que_nao_e_caractere(codigo, imprimivel):
+    assert is_printable(codigo) is imprimivel

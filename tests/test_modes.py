@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import cv2
 import numpy as np
 import pytest
 
-from contador_dedos.app import App, should_quit
+from contador_dedos.app import KEY_BACK, App, build_menu, should_quit
 from contador_dedos.config import AppConfig
 from contador_dedos.modes import MODE_FACTORIES, Mode, build_modes, close_modes
 from contador_dedos.modes.finger_counter import FingerCounter
+from contador_dedos.ui.menu import QUIT_KEY
+from contador_dedos.ui.widgets import Rect
 
 
 class FakeMode(Mode):
@@ -20,6 +23,7 @@ class FakeMode(Mode):
 
     def __init__(self, falha_ao_fechar: bool = False):
         self.processados = []
+        self.cliques = []
         self.fechado = False
         self._falha_ao_fechar = falha_ao_fechar
 
@@ -27,10 +31,17 @@ class FakeMode(Mode):
         self.processados.append(timestamp_ms)
         return frame
 
+    def on_mouse(self, event: int, x: int, y: int) -> None:
+        self.cliques.append((event, x, y))
+
     def close(self) -> None:
         self.fechado = True
         if self._falha_ao_fechar:
             raise RuntimeError("boom")
+
+
+def _frame(width: int = 640, height: int = 480) -> np.ndarray:
+    return np.zeros((height, width, 3), dtype=np.uint8)
 
 
 def test_mode_e_abstrato():
@@ -47,6 +58,7 @@ def test_mode_tem_ganchos_opcionais():
     """`on_mouse` e `close` são opcionais — a Fase 4 usa o primeiro."""
     modo = FakeMode()
     assert modo.on_mouse(0, 10, 20) is None
+    assert Mode.on_mouse(modo, 0, 10, 20) is None  # o padrão da ABC não faz nada
 
 
 def test_finger_counter_se_apresenta_para_o_menu():
@@ -93,19 +105,46 @@ def test_app_exige_ao_menos_um_modo():
         App(AppConfig(), [])
 
 
-def test_app_entra_no_primeiro_modo():
-    """Sem menu ainda, o app abre direto no primeiro modo registrado."""
-    primeiro, segundo = FakeMode(), FakeMode()
-    app = App(AppConfig(), [primeiro, segundo])
-    assert app.screen is primeiro
+def test_app_abre_no_menu():
+    app = App(AppConfig(), [FakeMode(), FakeMode()])
+    assert app.in_menu
+    assert app.screen is app.menu
     assert app.running is True
 
 
-@pytest.mark.parametrize("tecla", [ord("q"), ord("Q"), 27])
-def test_teclas_de_saida_param_o_loop(tecla):
+def test_menu_ganha_um_card_por_modo_mais_a_saida():
+    """É isto que torna barato acrescentar uma feature: o card vem de graça."""
+    menu = build_menu([FakeMode(), FakeMode()])
+    assert [e.key for e in menu.entries] == ["mode:0", "mode:1", QUIT_KEY]
+    assert [e.shortcut for e in menu.entries] == ["1", "2", "Q"]
+
+
+@pytest.mark.parametrize("tecla", [ord("q"), ord("Q")])
+def test_q_encerra_de_qualquer_tela(tecla):
     app = App(AppConfig(), [FakeMode()])
     app.handle_key(tecla)
     assert app.running is False
+
+    app = App(AppConfig(), [FakeMode()])
+    app.open_mode(0)
+    app.handle_key(tecla)
+    assert app.running is False
+
+
+def test_esc_volta_ao_menu_sem_encerrar():
+    app = App(AppConfig(), [FakeMode()])
+    app.open_mode(0)
+    assert not app.in_menu
+    app.handle_key(KEY_BACK)
+    assert app.in_menu
+    assert app.running is True
+
+
+def test_esc_no_menu_nao_faz_nada():
+    app = App(AppConfig(), [FakeMode()])
+    app.handle_key(KEY_BACK)
+    assert app.in_menu
+    assert app.running is True
 
 
 @pytest.mark.parametrize("tecla", [ord("a"), 255, ord(" ")])
@@ -114,6 +153,75 @@ def test_outras_teclas_nao_param_o_loop(tecla):
     app.handle_key(tecla)
     assert app.running is True
     assert should_quit(tecla) is False
+
+
+def test_atalho_numerico_abre_o_modo():
+    primeiro, segundo = FakeMode(), FakeMode()
+    app = App(AppConfig(), [primeiro, segundo])
+    app.handle_key(ord("2"))
+    app.apply_selection(app.menu.take_selection())
+    assert app.screen is segundo
+
+
+def test_atalho_so_vale_dentro_do_menu():
+    app = App(AppConfig(), [FakeMode(), FakeMode()])
+    app.open_mode(0)
+    app.handle_key(ord("2"))
+    assert app.menu.take_selection() is None, "o modo não pode receber atalhos do menu"
+
+
+def test_clique_no_card_abre_o_modo():
+    primeiro = FakeMode()
+    app = App(AppConfig(), [primeiro])
+    app.screen.process(_frame())
+    alvo = app.menu.layout(640, 480)[0]
+    app.on_mouse(cv2.EVENT_LBUTTONDOWN, *alvo.center)
+    app.apply_selection(app.menu.take_selection())
+    assert app.screen is primeiro
+
+
+def test_card_sair_encerra():
+    app = App(AppConfig(), [FakeMode()])
+    app.apply_selection(QUIT_KEY)
+    assert app.running is False
+
+
+def test_selecao_vazia_nao_muda_nada():
+    app = App(AppConfig(), [FakeMode()])
+    app.apply_selection(None)
+    assert app.in_menu and app.running
+
+
+def test_indice_de_modo_invalido_e_ignorado():
+    app = App(AppConfig(), [FakeMode()])
+    app.open_mode(9)
+    assert app.in_menu, "um índice fora da faixa não pode trocar de tela"
+
+
+def test_clique_no_voltar_pede_o_retorno_ao_menu():
+    """O clique só registra a intenção; o loop é quem troca de tela."""
+    app = App(AppConfig(), [FakeMode()])
+    app.open_mode(0)
+    app._back_rect = Rect(10, 400, 100, 30)
+    app.on_mouse(cv2.EVENT_LBUTTONDOWN, 50, 415)
+    assert app._back_requested is True
+
+
+def test_clique_fora_do_voltar_chega_ao_modo():
+    modo = FakeMode()
+    app = App(AppConfig(), [modo])
+    app.open_mode(0)
+    app._back_rect = Rect(10, 400, 100, 30)
+    app.on_mouse(cv2.EVENT_LBUTTONDOWN, 300, 100)
+    assert app._back_requested is False
+    assert modo.cliques == [(cv2.EVENT_LBUTTONDOWN, 300, 100)]
+
+
+def test_voltar_nao_aparece_no_menu():
+    app = App(AppConfig(), [FakeMode()])
+    app._back_rect = Rect(10, 400, 100, 30)
+    app.on_mouse(cv2.EVENT_LBUTTONDOWN, 50, 415)
+    assert app._back_requested is False, "no menu não há para onde voltar"
 
 
 def test_modo_recebe_o_frame_e_o_timestamp():
