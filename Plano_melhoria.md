@@ -404,7 +404,7 @@ O modo de face **só é aceitável** com estas garantias:
    A migração para `pyproject.toml` fica para a Fase 2, junto com o entry point.
 3. ✅ Adicionar `CONTRIBUTING.md` e templates `.github/` (bug, feature, PR).
 
-> **Próxima fase:** [Fase 5 — Modos de visão adicionais](#fase-5--modos-de-visão-adicionais).
+> **Próxima fase:** [Fase 6 — Identificação por Face](#fase-6--identificação-por-face--lgpd).
 
 ### Fase 1 — Correção e refatoração do núcleo (P0 + P1) — ✅ **concluída**
 
@@ -586,10 +586,50 @@ configuração para abrir, e um card que não faz nada é pior que a sua ausênc
 Os parâmetros seguem na CLI. Quando houver o que configurar, ele entra como
 qualquer outra entrada do menu.
 
-### Fase 5 — Modos de visão adicionais
-- **Reconhecimento de gestos:** joinha 👍, "paz" ✌️, "OK" 👌, mão aberta/fechada.
-- **Números em Libras** (0–10) com feedback textual.
-- Cada gesto/modo entra como um `Mode` novo + testes.
+### Fase 5 — Modos de visão adicionais — ✅ **concluída** (Libras parcial)
+
+Dois modos novos entraram, cada um como um `Mode` registrado — e o menu ganhou
+os dois cards sem que a camada de UI fosse tocada.
+
+- ✅ **Gestos** (`modes/gesture.py`): joinha, paz, OK, mão aberta e mão fechada.
+- ⚠️ **Números em Libras** (`modes/libras.py`): **1 a 5**. Ver a ressalva abaixo.
+- ✅ **`vision/handshape.py`**: a leitura geométrica da mão (dedos estendidos,
+  régua da mão, toque entre pontas, polegar para cima), compartilhada pelos três
+  modos. `count_fingers` virou a soma de `fingers_extended`.
+- ✅ **Detector compartilhado**: `build_hand_tracker` cria um `HandTracker` só,
+  passado a todos os modos. Antes, cada modo carregaria o modelo de novo.
+- ✅ **`ValueSmoother`** (era `CountSmoother`) subiu para `core/pipeline.py` e
+  virou genérico — contagens são inteiros, gestos e numerais são textos.
+- ✅ **`draw_hand_readout`** em `ui/widgets.py`: o painel de duas colunas que
+  gestos e Libras compartilham.
+
+**Testes:** 247 (eram 213 após os gestos, 170 antes da fase).
+
+> **Reconhecimento geométrico, não o do MediaPipe.** O `GestureRecognizer` da
+> Tasks API traz 7 gestos prontos, mas **não inclui o "OK"** que esta seção
+> pede, e exigiria um segundo modelo para baixar. Ler a geometria dos landmarks
+> reaproveita o detector já carregado e mantém a lógica pura e testável.
+
+> **⚠️ Libras: 1 a 5, e o porquê do resto ficar de fora.** Os numerais **0 e 6 a
+> 10 não são reconhecidos**, e a própria tela declara isso
+> (`COVERAGE_CAPTION`). De 6 a 9, as configurações não se reduzem a "N dedos
+> estendidos" e **variam por região**; o 10, em várias variantes, envolve
+> **movimento**, que um reconhecedor de frame único não captura. Chutar a
+> configuração de uma língua real e entregá-la como correta prejudicaria
+> exatamente quem usa Libras.
+>
+> O 1–5 segue a variante mais difundida (3 = polegar+indicador+médio;
+> 4 = quatro dedos sem o polegar). **Confirmar essa variante** com uma
+> referência de Libras é um item em aberto.
+>
+> **Para completar 6–10 depois é preciso:** (a) uma especificação confiável das
+> configurações, incluindo a variante regional adotada; e (b) para os numerais
+> com movimento, **análise temporal** — uma janela de frames em vez de um só,
+> o que o `VideoClock` e o `ValueSmoother` já deixam ao alcance.
+
+O que separa o modo Libras do *Contar Dedos* é *quais* dedos estão estendidos, e
+não quantos — três dedos quaisquer somam 3, mas só polegar+indicador+médio é o
+numeral 3. Há teste ancorando exatamente essa distinção.
 
 ### Fase 6 — Identificação por Face (+ LGPD)
 Implementar o modo **"Rosto (ID)"** ([Seção 5](#5-nova-funcionalidade-identificação-por-face)):
@@ -640,7 +680,10 @@ garantias de privacidade. Entregar com testes da camada de `FaceDB` (match/delet
 6. ~~**Fase 4 (menu clicável)** — entrega a experiência "escolha o que fazer".~~ ✅
    A aposta da Fase 3 se confirmou: o menu saiu sem tocar no loop, e um modo
    novo agora custa uma classe e uma linha no registro.
-7. Só então **gestos (Fase 5)** e **face (Fase 6)**, uma feature por PR, cada uma como um `Mode` com testes.
+7. ~~Só então **gestos (Fase 5)** e **face (Fase 6)**, uma feature por PR, cada uma como um `Mode` com testes.~~
+   Gestos e Libras (1–5) entregues na Fase 5. Restam: **face (Fase 6)** e o
+   complemento de **Libras 0 e 6–10**, que depende de referência de
+   configurações e de análise temporal.
 
 > **Princípios:** (1) estabilizar e testar o núcleo antes de expandir;
 > (2) a arquitetura modular vem **antes** das features novas — é o que as torna

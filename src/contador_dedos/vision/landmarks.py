@@ -17,6 +17,15 @@ FINGER_TIP_IDS: tuple[int, ...] = (8, 12, 16, 20)
 PIP_OFFSET = 2
 #: Ponta e articulação interfalângica do polegar.
 THUMB_TIP, THUMB_IP = 4, 3
+#: Base do polegar.
+THUMB_MCP = 2
+#: Ponta do indicador (o primeiro dos dedos longos).
+INDEX_TIP = 8
+#: Bases do indicador e do médio, e o pulso — a régua da mão.
+INDEX_MCP, MIDDLE_MCP, WRIST = 5, 9, 0
+
+#: Nomes dos dedos, na ordem em que ``fingers_extended`` os devolve.
+FINGER_NAMES = ("polegar", "indicador", "médio", "anelar", "mínimo")
 
 #: Um landmark já convertido para pixels da imagem.
 Point = tuple[int, int]

@@ -10,6 +10,8 @@ from contador_dedos.app import KEY_BACK, App, build_menu, should_quit
 from contador_dedos.config import AppConfig
 from contador_dedos.modes import MODE_FACTORIES, Mode, build_modes, close_modes
 from contador_dedos.modes.finger_counter import FingerCounter
+from contador_dedos.modes.gesture import GestureRecognizer
+from contador_dedos.modes.libras import LibrasNumbers
 from contador_dedos.ui.menu import QUIT_KEY
 from contador_dedos.ui.widgets import Rect
 
@@ -44,6 +46,19 @@ def _frame(width: int = 640, height: int = 480) -> np.ndarray:
     return np.zeros((height, width, 3), dtype=np.uint8)
 
 
+class _TrackerEspiao:
+    """Detector de mentira: registra se alguém tentou fechá-lo."""
+
+    def __init__(self):
+        self.fechado = False
+
+    def detect(self, frame, timestamp_ms):
+        return []
+
+    def close(self):
+        self.fechado = True
+
+
 def test_mode_e_abstrato():
     """Esquecer o `process` precisa falhar na hora, não em produção."""
 
@@ -72,18 +87,46 @@ def test_registro_nao_esta_vazio():
     assert MODE_FACTORIES
 
 
-def test_build_modes_repassa_a_config(monkeypatch):
+def test_build_modes_repassa_config_e_detector(monkeypatch):
     recebidos = []
 
-    def fabrica(config):
-        recebidos.append(config)
+    def fabrica(config, tracker):
+        recebidos.append((config, tracker))
         return FakeMode()
 
     monkeypatch.setattr("contador_dedos.modes.MODE_FACTORIES", (fabrica, fabrica))
-    config = AppConfig(camera_index=3)
-    modos = build_modes(config)
+    config, tracker = AppConfig(camera_index=3), object()
+    modos = build_modes(config, tracker)
     assert len(modos) == 2
-    assert recebidos == [config, config]
+    assert recebidos == [(config, tracker), (config, tracker)]
+
+
+def test_detector_e_um_so_para_todos_os_modos(monkeypatch):
+    """Um detector por modo carregaria o mesmo modelo várias vezes."""
+    trackers = []
+
+    def fabrica(config, tracker):
+        trackers.append(tracker)
+        return FakeMode()
+
+    monkeypatch.setattr("contador_dedos.modes.MODE_FACTORIES", (fabrica, fabrica, fabrica))
+    build_modes(AppConfig(), object())
+    assert len({id(t) for t in trackers}) == 1
+
+
+@pytest.mark.parametrize("modo", [FingerCounter, GestureRecognizer, LibrasNumbers])
+def test_modos_registrados_nao_fecham_o_detector_compartilhado(modo):
+    """Fechar o detector em um modo derrubaria os outros."""
+    tracker = _TrackerEspiao()
+    instancia = modo.from_config(AppConfig(), tracker)
+    instancia.close()
+    assert tracker.fechado is False
+
+
+def test_registro_traz_os_modos_de_visao():
+    assert len(MODE_FACTORIES) == 3
+    nomes = {FingerCounter.name, GestureRecognizer.name, LibrasNumbers.name}
+    assert nomes == {"Contar Dedos", "Gestos", "Libras"}
 
 
 def test_close_modes_fecha_todos():
@@ -117,6 +160,14 @@ def test_menu_ganha_um_card_por_modo_mais_a_saida():
     menu = build_menu([FakeMode(), FakeMode()])
     assert [e.key for e in menu.entries] == ["mode:0", "mode:1", QUIT_KEY]
     assert [e.shortcut for e in menu.entries] == ["1", "2", "Q"]
+
+
+def test_o_modo_de_gestos_aparece_no_menu():
+    """O card do modo novo veio sem tocar na camada de UI."""
+    modos = [FingerCounter(_TrackerEspiao()), GestureRecognizer(_TrackerEspiao())]
+    menu = build_menu([*modos, LibrasNumbers(_TrackerEspiao())])
+    assert [e.label for e in menu.entries] == ["Contar Dedos", "Gestos", "Libras", "Sair"]
+    assert [e.shortcut for e in menu.entries] == ["1", "2", "3", "Q"]
 
 
 @pytest.mark.parametrize("tecla", [ord("q"), ord("Q")])

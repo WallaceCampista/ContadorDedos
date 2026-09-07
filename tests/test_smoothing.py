@@ -4,29 +4,28 @@ from __future__ import annotations
 
 import pytest
 
-from contador_dedos.core.pipeline import FpsMeter, VideoClock
-from contador_dedos.modes.finger_counter import CountSmoother
+from contador_dedos.core.pipeline import FpsMeter, ValueSmoother, VideoClock
 
 
 def test_janela_precisa_ser_positiva():
     with pytest.raises(ValueError, match="janela"):
-        CountSmoother(0)
+        ValueSmoother(0)
 
 
 def test_primeira_leitura_aparece_imediatamente():
-    assert CountSmoother(5).update(3) == 3
+    assert ValueSmoother(5).update(3) == 3
 
 
 def test_leitura_isolada_nao_derruba_o_valor_estavel():
     """O caso que motivou o componente: um frame ruim no meio de vários bons."""
-    smoother = CountSmoother(5)
+    smoother = ValueSmoother(5)
     for _ in range(4):
         smoother.update(5)
     assert smoother.update(2) == 5
 
 
 def test_valor_novo_assume_quando_vira_maioria():
-    smoother = CountSmoother(3)
+    smoother = ValueSmoother(3)
     for _ in range(3):
         smoother.update(5)
     assert smoother.update(2) == 5  # 5,5,2
@@ -34,7 +33,7 @@ def test_valor_novo_assume_quando_vira_maioria():
 
 
 def test_mao_ausente_some_apos_encher_a_janela():
-    smoother = CountSmoother(3)
+    smoother = ValueSmoother(3)
     for _ in range(3):
         smoother.update(4)
     assert smoother.update(None) == 4
@@ -42,7 +41,7 @@ def test_mao_ausente_some_apos_encher_a_janela():
 
 
 def test_janela_unitaria_nao_suaviza():
-    smoother = CountSmoother(1)
+    smoother = ValueSmoother(1)
     assert [smoother.update(v) for v in (1, 4, 2)] == [1, 4, 2]
 
 
@@ -100,3 +99,10 @@ def test_relogio_avanca_mesmo_se_o_tempo_andar_para_tras():
 
 def test_relogio_usa_o_relogio_real_por_padrao():
     assert VideoClock().tick() >= 0
+
+
+def test_suavizador_serve_para_qualquer_valor():
+    """Contagens são inteiros; gestos são textos. O componente é o mesmo."""
+    smoother = ValueSmoother(3)
+    assert [smoother.update(v) for v in ("Paz", "Paz", "OK")] == ["Paz", "Paz", "Paz"]
+    assert smoother.update("OK") == "OK"

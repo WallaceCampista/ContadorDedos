@@ -30,6 +30,9 @@ from .theme import (
     VEIL_ALPHA,
 )
 
+#: Mostrado no lugar de um valor que não pôde ser lido.
+UNKNOWN_VALUE = "—"
+
 
 @dataclass(frozen=True)
 class Rect:
@@ -128,6 +131,18 @@ def draw_centered_text(
     draw_text(img, text, (center_x - width // 2, baseline_y), scale, color, thickness)
 
 
+def draw_center_message(img, text: str, scale: float) -> None:
+    """Mensagem no centro da tela — o estado vazio de um modo.
+
+    Dizer "nenhuma mão detectada" evita a ambiguidade de um zero, que tanto
+    pode significar "punho fechado" quanto "não estou vendo nada".
+    """
+    height, width = img.shape[:2]
+    draw_centered_text(
+        img, text, width // 2, height // 2, 0.6 * scale, COLOR_MUTED, max(1, int(scale))
+    )
+
+
 def draw_panel(
     img,
     rect: Rect,
@@ -218,6 +233,67 @@ def draw_button(img, rect: Rect, text: str, scale: float, hovered: bool = False)
         COLOR_ACCENT if hovered else COLOR_TEXT,
         max(1, int(scale)),
     )
+
+
+def draw_hand_readout(
+    img,
+    values: dict[str, str | None],
+    mirrored: bool = True,
+    caption: str | None = None,
+    empty_message: str | None = None,
+) -> None:
+    """Painel de duas colunas: o que foi lido em cada mão.
+
+    Cada coluna fica do lado da tela em que aquela mão realmente aparece, e a
+    da direita é alinhada pela borda — com deslocamento fixo, um valor mais
+    longo vazaria para fora do frame.
+
+    Args:
+        values: o valor de cada mão, nas chaves ``"Left"``/``"Right"``.
+        mirrored: se a imagem está espelhada (define de que lado cada mão está).
+        caption: nota discreta abaixo dos valores, para limitações do modo.
+        empty_message: mostrado no centro quando nenhuma mão foi lida.
+    """
+    height, width = img.shape[:2]
+    scale = hud_scale(height)
+    margin = int(10 * scale)
+    label_scale, value_scale = 0.5 * scale, 0.8 * scale
+    label_weight, value_weight = max(1, int(scale)), max(2, int(2 * scale))
+    band_height = int((94 if caption else 76) * scale)
+    draw_panel(img, Rect(0, 0, width, band_height))
+
+    left_hand, right_hand = ("Left", "Right") if mirrored else ("Right", "Left")
+    colunas = (
+        (left_hand, "Esquerda" if mirrored else "Direita", False),
+        (right_hand, "Direita" if mirrored else "Esquerda", True),
+    )
+
+    for hand, side_label, align_right in colunas:
+        value = values[hand]
+        shown = value or UNKNOWN_VALUE
+        if align_right:
+            label_x = width - margin - text_size(side_label, label_scale, label_weight)[0]
+            value_x = width - margin - text_size(shown, value_scale, value_weight)[0]
+        else:
+            label_x = value_x = margin
+        draw_text(
+            img, side_label, (label_x, int(28 * scale)), label_scale, COLOR_MUTED, label_weight
+        )
+        draw_text(
+            img,
+            shown,
+            (value_x, int(60 * scale)),
+            value_scale,
+            COLOR_ACCENT if value else COLOR_MUTED,
+            value_weight,
+        )
+
+    if caption:
+        draw_centered_text(
+            img, caption, width // 2, band_height - int(10 * scale), 0.4 * scale, COLOR_MUTED
+        )
+    if empty_message and all(value is None for value in values.values()):
+        draw_center_message(img, empty_message, scale)
 
 
 def draw_status_bar(

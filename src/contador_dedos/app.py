@@ -14,7 +14,7 @@ import cv2
 from .config import AppConfig, parse_args
 from .core.camera import Camera, CameraError
 from .core.pipeline import FpsMeter, VideoClock
-from .modes import Mode, build_modes, close_modes
+from .modes import Mode, build_hand_tracker, build_modes, close_modes
 from .ui.menu import QUIT_KEY, Menu, MenuEntry
 from .ui.widgets import Rect, draw_status_bar
 from .vision.model import ModelError
@@ -167,15 +167,16 @@ class App:
 def main(argv: Sequence[str] | None = None) -> int:
     """Ponto de entrada: devolve 0 em caso de sucesso, 1 em caso de erro."""
     config = parse_args(argv)
-    modes: list[Mode] = []
     try:
-        modes = build_modes(config)
-        App(config, modes).run()
+        with build_hand_tracker(config) as tracker:
+            modes = build_modes(config, tracker)
+            try:
+                App(config, modes).run()
+            finally:
+                close_modes(modes)
     except (CameraError, ModelError) as error:
         print(f"Erro: {error}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         pass
-    finally:
-        close_modes(modes)
     return 0

@@ -6,41 +6,20 @@ devolve um número. É isso que permite testá-la sem webcam e sem modelo.
 
 from __future__ import annotations
 
-from collections import Counter, deque
 from collections.abc import Sequence
 
 from ..core.overlay import draw_hand_landmarks
-from ..ui.theme import COLOR_MUTED, COLOR_TEXT, COLOR_TOTAL
-from ..ui.widgets import Rect, draw_centered_text, draw_panel, draw_text, hud_scale
+from ..core.pipeline import ValueSmoother
+from ..ui.theme import COLOR_TEXT, COLOR_TOTAL
+from ..ui.widgets import Rect, draw_center_message, draw_panel, draw_text, hud_scale
 from ..vision.hands import HandTracker, real_hand
-from ..vision.landmarks import (
-    FINGER_TIP_IDS,
-    PIP_OFFSET,
-    THUMB_IP,
-    THUMB_TIP,
-    Point,
-    landmarks_to_pixels,
-    validate,
-)
+from ..vision.handshape import fingers_extended
+from ..vision.landmarks import Point, landmarks_to_pixels
 from .base import Mode
 
 # ---------------------------------------------------------------------------
 # Lógica pura
 # ---------------------------------------------------------------------------
-
-
-def is_thumb_extended(landmarks: Sequence[Point], handedness: str) -> bool:
-    """Diz se o polegar está estendido.
-
-    ``handedness`` é o rótulo devolvido pelo MediaPipe (``"Left"``/``"Right"``)
-    **para o mesmo frame** de onde vieram os landmarks. O MediaPipe classifica
-    a lateralidade assumindo uma imagem espelhada, e essa mesma convenção fixa
-    o sentido em que o polegar aponta no eixo X — por isso a regra abaixo vale
-    tanto com quanto sem ``cv2.flip`` (ver :func:`count_fingers`).
-    """
-    if handedness == "Right":
-        return landmarks[THUMB_TIP][0] > landmarks[THUMB_IP][0]
-    return landmarks[THUMB_TIP][0] < landmarks[THUMB_IP][0]
 
 
 def count_fingers(landmarks: Sequence[Point], handedness: str) -> int:
@@ -51,38 +30,11 @@ def count_fingers(landmarks: Sequence[Point], handedness: str) -> int:
         handedness: ``"Left"`` ou ``"Right"``, como reportado pelo MediaPipe
             para o frame processado.
 
-    Os quatro dedos longos contam como levantados quando a ponta está *acima*
-    da articulação PIP (Y menor, pois o eixo cresce para baixo). O polegar usa
-    o eixo X, porque ele se abre lateralmente — daí depender da lateralidade.
-
     Como o rótulo do MediaPipe e a geometria da imagem seguem a mesma convenção
     de espelhamento, o resultado independe de o frame ter sido espelhado ou não;
     o que muda é apenas a qual mão real aquele rótulo corresponde.
     """
-    validate(landmarks)
-
-    count = 1 if is_thumb_extended(landmarks, handedness) else 0
-    for tip in FINGER_TIP_IDS:
-        if landmarks[tip][1] < landmarks[tip - PIP_OFFSET][1]:
-            count += 1
-    return count
-
-
-class CountSmoother:
-    """Anti-flicker: devolve o valor mais frequente das últimas N leituras.
-
-    ``None`` representa "mão ausente" e também entra na janela, de modo que o
-    contador some suavemente quando a mão sai do quadro.
-    """
-
-    def __init__(self, window: int = 5) -> None:
-        if window < 1:
-            raise ValueError("A janela de suavização precisa ser >= 1.")
-        self._history: deque[int | None] = deque(maxlen=window)
-
-    def update(self, value: int | None) -> int | None:
-        self._history.append(value)
-        return Counter(self._history).most_common(1)[0][0]
+    return sum(fingers_extended(landmarks, handedness))
 
 
 # ---------------------------------------------------------------------------
@@ -133,21 +85,7 @@ def draw_counters(img, counts: dict[str, int | None], mirrored: bool) -> None:
     draw_counter(img, "Total", total, width // 2 - int(30 * scale), scale, COLOR_TOTAL)
 
     if all(value is None for value in counts.values()):
-        draw_empty_state(img, scale)
-
-
-def draw_empty_state(img, scale: float) -> None:
-    """Diz o que está acontecendo quando não há nada para contar."""
-    height, width = img.shape[:2]
-    draw_centered_text(
-        img,
-        "Nenhuma mão detectada",
-        width // 2,
-        height // 2,
-        0.6 * scale,
-        COLOR_MUTED,
-        max(1, int(scale)),
-    )
+        draw_center_message(img, "Nenhuma mão detectada", scale)
 
 
 # ---------------------------------------------------------------------------
@@ -166,19 +104,12 @@ class FingerCounter(Mode):
         self._tracker = tracker
         self._mirrored = mirrored
         self._smoothers = {
-            "Left": CountSmoother(smooth_window),
-            "Right": CountSmoother(smooth_window),
+            "Left": ValueSmoother(smooth_window),
+            "Right": ValueSmoother(smooth_window),
         }
 
     @classmethod
-    def from_config(cls, config) -> FingerCounter:
-        """Constrói o modo (e o seu detector) a partir da configuração."""
-        tracker = HandTracker(
-            model_path=config.model_path,
-            max_hands=config.max_hands,
-            detection_confidence=config.detection_confidence,
-            tracking_confidence=config.tracking_confidence,
-        )
+    def from_config(cls, config, tracker: HandTracker) -> FingerCounter:
         return cls(tracker, mirrored=config.mirror, smooth_window=config.smooth_window)
 
     def process(self, frame, timestamp_ms: int = 0):
@@ -197,4 +128,4 @@ class FingerCounter(Mode):
         return frame
 
     def close(self) -> None:
-        self._tracker.close()
+        """O detector é compartilhado — quem o criou é que o libera."""

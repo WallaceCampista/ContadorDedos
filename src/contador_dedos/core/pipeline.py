@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 import time
+from collections import Counter, deque
+from collections.abc import Hashable
+from typing import TypeVar
+
+T = TypeVar("T", bound=Hashable)
 
 
 class VideoClock:
@@ -45,3 +50,20 @@ class FpsMeter:
                 )
         self._last = now
         return self._fps
+
+
+class ValueSmoother:
+    """Anti-flicker: devolve o valor mais frequente das últimas N leituras.
+
+    ``None`` representa "sem leitura" e também entra na janela, de modo que o
+    valor exibido some suavemente quando a mão sai do quadro.
+    """
+
+    def __init__(self, window: int = 5) -> None:
+        if window < 1:
+            raise ValueError("A janela de suavização precisa ser >= 1.")
+        self._history: deque[T | None] = deque(maxlen=window)
+
+    def update(self, value: T | None) -> T | None:
+        self._history.append(value)
+        return Counter(self._history).most_common(1)[0][0]

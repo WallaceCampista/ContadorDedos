@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from contador_dedos.modes.finger_counter import count_fingers, is_thumb_extended
+from contador_dedos.modes.finger_counter import count_fingers
 from contador_dedos.vision.hands import real_hand
+from contador_dedos.vision.handshape import fingers_extended, is_thumb_extended
 from contador_dedos.vision.landmarks import LANDMARK_COUNT
 from helpers import make_hand
 
@@ -81,3 +82,12 @@ def test_real_hand_e_involutivo(espelhado):
     """Aplicar a conversão duas vezes com o mesmo espelhamento volta ao início."""
     for rotulo in HANDS:
         assert real_hand(real_hand(rotulo, espelhado), espelhado) == rotulo
+
+
+@pytest.mark.parametrize("handedness", HANDS)
+def test_contagem_e_a_soma_dos_dedos_estendidos(handedness):
+    """A contagem e os gestos leem a mesma primitiva — não podem divergir."""
+    for thumb in (False, True):
+        for fingers in [(False,) * 4, (True, True, False, False), (True,) * 4]:
+            mao = make_hand(handedness, thumb, fingers)
+            assert count_fingers(mao, handedness) == sum(fingers_extended(mao, handedness))

@@ -11,6 +11,8 @@
 - [Funcionalidades](#funcionalidades)
   - [Menu interativo](#menu-interativo)
   - [Detecção de Mãos](#detecao-de-maos)
+  - [Reconhecimento de gestos](#reconhecimento-de-gestos)
+  - [Números em Libras](#numeros-em-libras)
   - [Contagem de Dedos](#contagem-de-dedos)
   - [Visualização em Tempo Real](#visualizacao-em-tempo-real)
 - [Tecnologias Utilizadas](#tecnologias-utilizadas)
@@ -43,10 +45,14 @@ registrados, então cada funcionalidade nova ganha o seu card automaticamente.
 │                Contador de Dedos                 │
 │             Escolha o que deseja fazer           │
 │                                                  │
-│       ┌──────────────┐   ┌──────────────┐        │
-│       │      1       │   │      Q       │        │
-│       │ Contar Dedos │   │     Sair     │        │
-│       └──────────────┘   └──────────────┘        │
+│  ┌──────────────┐ ┌──────────┐ ┌──────────┐    │
+│  │      1       │ │    2     │ │    3     │    │
+│  │ Contar Dedos │ │  Gestos  │ │  Libras  │    │
+│  └──────────────┘ └──────────┘ └──────────┘    │
+│                  ┌──────────┐                   │
+│                  │    Q     │                   │
+│                  │   Sair   │                   │
+│                  └──────────┘                   │
 │                                                  │
 │     Clique em um card  •  Q encerra    29.9 FPS  │
 └──────────────────────────────────────────────────┘
@@ -65,6 +71,48 @@ disponíveis na tela atual.
 
 ### Detecção de Mãos:
 Identifica a presença de uma ou duas mãos no quadro da webcam.
+
+<h3 id="reconhecimento-de-gestos">Reconhecimento de gestos</h3>
+
+O modo **Gestos** identifica a configuração de cada mão e mostra o nome dela:
+
+| Gesto | Como fazer |
+|-------|-----------|
+| **Joinha** | Punho fechado, polegar apontando para cima |
+| **Paz** | Indicador e médio levantados, anelar e mínimo recolhidos |
+| **OK** | Ponta do polegar encostando na do indicador, os outros três estendidos |
+| **Mão aberta** | Os cinco dedos estendidos |
+| **Mão fechada** | Punho fechado |
+
+O reconhecimento é **geométrico**: lê as distâncias e posições entre os
+landmarks, sem um segundo modelo para baixar. Ele reaproveita o mesmo detector
+de mãos do modo de contagem — os dois modos compartilham uma única instância.
+
+Quando a mão não forma nenhum gesto conhecido, a tela mostra `—` em vez de
+chutar o mais parecido.
+
+<h3 id="numeros-em-libras">Números em Libras</h3>
+
+O modo **Libras** identifica o numeral pela configuração da mão e mostra o
+algarismo com o nome por extenso (`3 · três`).
+
+> **Cobertura: 1 a 5.** Os numerais **0 e 6 a 10 ainda não são reconhecidos**, e
+> a própria tela avisa isso. Os motivos são honestos: de 6 a 9 as configurações
+> não se reduzem a "N dedos estendidos" e **variam por região**; e o 10, em
+> várias variantes, envolve **movimento**, que um reconhecedor de frame único
+> não captura. Preferimos não cobrir a chutar a configuração de uma língua real.
+
+O que separa este modo do *Contar Dedos* é **quais** dedos estão estendidos, e
+não quantos: três dedos quaisquer somam 3, mas só polegar + indicador + médio é
+o numeral **3** em Libras.
+
+| Numeral | Configuração |
+|---------|--------------|
+| **1** | Indicador |
+| **2** | Indicador + médio |
+| **3** | Polegar + indicador + médio |
+| **4** | Indicador + médio + anelar + mínimo (sem o polegar) |
+| **5** | Os cinco dedos |
 
 ### Contagem de Dedos:
 Conta o número de dedos estendidos para cada mão (esquerda e direita) e exibe o total.
@@ -140,7 +188,8 @@ python -m contador_dedos
 ```
 
 A janela da sua webcam abre no **menu**; clique em *Contar Dedos* (ou aperte `1`)
-para começar. **ESC** volta ao menu e **Q** encerra.
+ou em *Gestos* (`2`) ou *Libras* (`3`) para começar. **ESC** volta ao menu e
+**Q** encerra.
 
 > Se o modelo `hand_landmarker.task` ainda não estiver em `models/`, ele é baixado automaticamente nesta primeira execução.
 
@@ -219,10 +268,11 @@ como um módulo plugável em vez de engordar um script único:
   vídeo e a anotação do frame.
 - **`ui/`** — o tema (paleta e métricas), as primitivas de desenho (cards,
   painéis, botões) e o menu. Trocar a HighGUI por PySide6 mexeria só aqui.
-- **`vision/`** — a única camada que conhece o MediaPipe. Trocar ou atualizar a
-  biblioteca mexe só aqui.
-- **`modes/`** — cada feature é um `Mode` (contagem de dedos hoje; gestos e
-  rosto adiante). Adicionar uma = criar a classe e registrá-la.
+- **`vision/`** — a única camada que conhece o MediaPipe, mais a leitura
+  geométrica da mão (`handshape.py`) que contagem e gestos compartilham.
+- **`modes/`** — cada feature é um `Mode` (contagem, gestos e Libras hoje;
+  rosto adiante). Adicionar uma = criar a classe e registrá-la. Todos
+  compartilham **um único** detector de mãos, criado uma vez.
 - **`app.py`** — o loop, que conhece apenas o contrato `Mode`.
 
 A estrutura de arquivos:
@@ -240,7 +290,7 @@ A estrutura de arquivos:
 │   ├── core/             # câmera, relógio do vídeo e anotação do frame
 │   ├── ui/               # tema, primitivas de desenho e a tela de menu
 │   ├── vision/           # tudo que fala com o MediaPipe (+ download do modelo)
-│   └── modes/            # features plugáveis: base.py (ABC) e finger_counter.py
+│   └── modes/            # features plugáveis: base.py (ABC) + um arquivo por modo
 ├── tests/                # suíte pytest (sem webcam, sem modelo, sem rede)
 ├── pyproject.toml        # metadados, dependências, entry point e config das ferramentas
 ├── .pre-commit-config.yaml

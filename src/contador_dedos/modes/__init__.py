@@ -11,19 +11,40 @@ import sys
 from collections.abc import Sequence
 from typing import Callable
 
+from ..vision.hands import HandTracker
 from .base import Mode
 from .finger_counter import FingerCounter
+from .gesture import GestureRecognizer
+from .libras import LibrasNumbers
 
-#: Uma fábrica recebe a configuração e devolve um modo pronto para usar.
+#: Uma fábrica recebe a configuração e o detector compartilhado.
 ModeFactory = Callable[..., Mode]
 
 #: O registro. A ordem aqui é a ordem dos cards no menu.
-MODE_FACTORIES: tuple[ModeFactory, ...] = (FingerCounter.from_config,)
+MODE_FACTORIES: tuple[ModeFactory, ...] = (
+    FingerCounter.from_config,
+    GestureRecognizer.from_config,
+    LibrasNumbers.from_config,
+)
 
 
-def build_modes(config) -> list[Mode]:
-    """Instancia todos os modos registrados."""
-    return [factory(config) for factory in MODE_FACTORIES]
+def build_hand_tracker(config) -> HandTracker:
+    """Cria o detector de mãos que os modos compartilham.
+
+    Um detector por modo significaria carregar o mesmo modelo várias vezes; o
+    dono é quem o cria, e é quem o fecha.
+    """
+    return HandTracker(
+        model_path=config.model_path,
+        max_hands=config.max_hands,
+        detection_confidence=config.detection_confidence,
+        tracking_confidence=config.tracking_confidence,
+    )
+
+
+def build_modes(config, tracker: HandTracker) -> list[Mode]:
+    """Instancia todos os modos registrados, sobre o detector compartilhado."""
+    return [factory(config, tracker) for factory in MODE_FACTORIES]
 
 
 def close_modes(modes: Sequence[Mode]) -> None:
@@ -39,4 +60,14 @@ def close_modes(modes: Sequence[Mode]) -> None:
             print(f"Aviso: falha ao encerrar o modo {mode.name!r}: {error}", file=sys.stderr)
 
 
-__all__ = ["MODE_FACTORIES", "FingerCounter", "Mode", "ModeFactory", "build_modes", "close_modes"]
+__all__ = [
+    "MODE_FACTORIES",
+    "FingerCounter",
+    "GestureRecognizer",
+    "LibrasNumbers",
+    "Mode",
+    "ModeFactory",
+    "build_hand_tracker",
+    "build_modes",
+    "close_modes",
+]
