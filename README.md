@@ -22,6 +22,7 @@
 - [Pré-requisitos](#pre-requisitos)
 - [Como Configurar e Executar](#como-configurar-e-executar)
   - [Opções de linha de comando](#opcoes-de-linha-de-comando)
+- [Versão web](#versao-web)
 - [Privacidade e LGPD](#privacidade-e-lgpd)
 - [Qualidade: testes e lint](#qualidade-testes-e-lint)
 - [Arquitetura do Projeto](#arquitetura-do-projeto)
@@ -187,6 +188,8 @@ qualquer webcam.
 
 - sounddevice: Toca o feedback sonoro opcional (`--sound`).
 
+- Streamlit + streamlit-webrtc: Front web opcional, com vídeo em tempo real.
+
 - MediaPipe (Tasks API): Estrutura de aprendizado de máquina para detecção e rastreamento de mãos, via `HandLandmarker`.
 
 > A partir do MediaPipe 0.10.35 a API legada `mp.solutions` foi removida. O projeto usa a **Tasks API**, que depende de arquivos de modelo que não vêm no wheel — baixados pelo `setup.sh` (ou sob demanda), verificados por SHA-256 e mantidos fora do versionamento.
@@ -226,6 +229,7 @@ Acompanhe cada etapa com **barra de progresso e porcentagem**:
 | Flag | O que muda |
 |------|-----------|
 | `--no-dev` | Não instala pytest/ruff/black/pre-commit. |
+| `--web` | Instala também o front web (Streamlit, ~200 MB). |
 | `--skip-models` | Não baixa os modelos (~130 MB); o app os busca sob demanda. |
 | `--reinstall` | Reinstala as dependências. |
 | `-h` | Ajuda. |
@@ -310,6 +314,32 @@ simplesmente não toca, sem atrapalhar o resto.
 
 <br>
 
+<h2 id="versao-web">Versão web</h2>
+
+Além da janela nativa, o projeto roda no navegador — **os mesmos modos, a mesma
+lógica**, trocando só a moldura: a barra lateral substitui os cards e o vídeo
+chega por WebRTC.
+
+```bash
+./setup.sh --web                  # instala o extra (Streamlit, ~200 MB)
+.venv/bin/contador-dedos-web      # abre em http://127.0.0.1:8501
+```
+
+O front web tem **contagem, gestos e Libras** completos. No modo **Rosto** ele
+**reconhece e exclui**, mas **não cadastra**: o cadastro exige a tela de
+consentimento, que vive no app nativo. Manter uma única implementação do
+consentimento é mais seguro do que ter duas para errar.
+
+> **Só no laço local.** O servidor sobe fixado em `127.0.0.1`. Isso é
+> deliberado: a base de rostos é dado biométrico, e expor a página na rede
+> mudaria o perfil de risco do projeto inteiro.
+
+Uma limitação conhecida no macOS: `PyAV` e `opencv-python` embarcam versões
+diferentes do `libavdevice`, e o sistema imprime um aviso sobre classes
+duplicadas ao iniciar. Não observamos falha por causa disso, mas fica o registro.
+
+<br>
+
 ## Privacidade e LGPD
 
 Dados biométricos faciais são **dados pessoais sensíveis** (LGPD, Art. 5º, II).
@@ -323,6 +353,7 @@ O modo de rosto foi construído com essas garantias, e elas não são opcionais:
 | **Acesso restrito** | Os arquivos são gravados com permissão `0600` — só o seu usuário lê. |
 | **Direito ao esquecimento** | Botão **Excluir** por pessoa, em *Gerenciar*. A remoção é imediata e persiste em disco. |
 | **Fora do versionamento** | `faces/`, `*.npz`, `*.onnx` e `*.tflite` estão no `.gitignore`. Nenhum dado biométrico entra no repositório. |
+| **Sem exposição em rede** | O front web sobe fixado em `127.0.0.1`, e não faz cadastro — só reconhecimento e exclusão. |
 
 Um índice legível em `faces/faces.json` lista **quem** está cadastrado (sem
 expor vetor nenhum), para você auditar o conteúdo da base a qualquer momento.
@@ -404,6 +435,7 @@ A estrutura de arquivos:
 │   ├── i18n.py           # catálogo pt/en dos rótulos
 │   ├── core/             # câmera, relógio, anotação, captura e som
 │   ├── ui/               # tema, primitivas de desenho e a tela de menu
+│   ├── web/              # front Streamlit (extra opcional `[web]`)
 │   ├── vision/           # MediaPipe, ArcFace e o download dos modelos
 │   ├── storage/          # base local de rostos (nunca versionada)
 │   └── modes/            # features plugáveis: base.py (ABC) + um arquivo por modo

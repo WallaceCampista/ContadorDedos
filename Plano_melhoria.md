@@ -744,10 +744,26 @@ escolhidos os três que cabem no app atual sem uma segunda arquitetura.
 - ⬜ **Modo "controle por gesto"** — precisa de `pyautogui` como dependência
   nova, de permissão de **Acessibilidade** no macOS, e de definir quais gestos
   disparam quais ações, com trava contra disparo acidental. Merece fase própria.
-- ⬜ **Versão web (Streamlit/Gradio)** — webcam em tempo real exige
-  `streamlit-webrtc`, e o resultado é efetivamente uma **segunda interface**,
-  duplicando o loop de vídeo e o roteamento de telas. O backlog já marcava
-  esforço **Alto**.
+- ✅ **Versão web (Streamlit)** — entregue depois, em `contador_dedos/web/`.
+  O receio de "duplicar o loop de vídeo" não se concretizou: a página é uma casca
+  fina sobre `HandEngine`/`FaceEngine`, que chamam os **mesmos** objetos `Mode`.
+  Foi o retorno concreto da arquitetura das Fases 3–5.
+
+  Detalhes que custaram tempo e ficam registrados:
+  - `streamlit-webrtc` puxa o **PyAV**, que compila do zero na maioria das
+    versões. Só a série **12.3.0** tem wheel para Python 3.9 em arm64 — daí o pin.
+  - O Streamlit executa a página como **script solto**, fora do pacote: imports
+    relativos quebram. A página usa imports absolutos, e há teste para isso.
+  - `HTTP 200` **não** prova que a página funciona — o script só roda quando uma
+    sessão conecta. Dois bugs passaram por esse teste e foram pegos pelo
+    `AppTest` do Streamlit, que executa o script de verdade.
+  - O processamento de frame mora no `engine`, não na página, justamente para ser
+    testável sem Streamlit.
+
+  **Escopo do modo Rosto no web:** reconhece e exclui, mas **não cadastra**. O
+  cadastro depende da tela de consentimento, e duplicá-la em uma segunda moldura
+  dobraria a superfície onde ela pode sair errada. O servidor sobe fixado em
+  `127.0.0.1` pelo mesmo motivo.
 
 ---
 
@@ -770,7 +786,7 @@ escolhidos os três que cabem no app atual sem uma segunda arquitetura.
 | **Face** | **Cadastro + consentimento + garantias LGPD** | **6** | **Médio** |
 | ~~P3~~ | ~~Snapshots/gravação, feedback sonoro~~ ✅ | 7 | Médio |
 | P3 | Modo "controle por gesto" (pendente) | 7 | Médio |
-| P3 | Versão web (Streamlit/Gradio) (pendente) | 7 | Alto |
+| ~~P3~~ | ~~Versão web (Streamlit/Gradio)~~ ✅ | 7 | Alto |
 | P3 | Libras: numerais 0 e 6–10 (pendente) | 5 | Alto |
 
 ---

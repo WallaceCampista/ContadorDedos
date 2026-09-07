@@ -6,6 +6,7 @@
 #
 # Uso:
 #   ./setup.sh                  # ambiente completo
+#   ./setup.sh --web            # inclui o front web (Streamlit, ~200 MB)
 #   ./setup.sh --no-dev         # sem pytest/ruff/black/pre-commit
 #   ./setup.sh --skip-models    # sem baixar modelos (~130 MB)
 #   ./setup.sh --reinstall      # reinstala as dependências
@@ -21,11 +22,13 @@ set -eo pipefail
 REINSTALL=false
 DEV=true
 MODELS=true
+WEB=false
 
 for arg in "$@"; do
     case "$arg" in
         --reinstall)   REINSTALL=true ;;
         --no-dev)      DEV=false ;;
+        --web)         WEB=true ;;
         --skip-models) MODELS=false ;;
         -h|--help)
             awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$0"
@@ -179,15 +182,22 @@ venv_paths
 # ==============================================================================
 # 3. Dependências (OpenCV + MediaPipe)
 # ==============================================================================
+EXTRAS=""
+CHECK_IMPORTS='import cv2, mediapipe, onnxruntime'
+TITULO="Dependências (OpenCV + MediaPipe + ONNX Runtime)"
 if [ "$DEV" = true ]; then
-    progress_header "Dependências + ferramentas de desenvolvimento"
-    PIP_TARGET=".[dev]"
-    CHECK_IMPORTS='import cv2, mediapipe, onnxruntime, pytest, ruff'
-else
-    progress_header "Dependências (OpenCV + MediaPipe + ONNX Runtime)"
-    PIP_TARGET="."
-    CHECK_IMPORTS='import cv2, mediapipe, onnxruntime'
+    EXTRAS="dev"
+    CHECK_IMPORTS="$CHECK_IMPORTS, pytest, ruff"
+    TITULO="Dependências + ferramentas de desenvolvimento"
 fi
+if [ "$WEB" = true ]; then
+    EXTRAS="${EXTRAS:+$EXTRAS,}web"
+    CHECK_IMPORTS="$CHECK_IMPORTS, streamlit, streamlit_webrtc"
+    TITULO="$TITULO + front web"
+fi
+progress_header "$TITULO"
+PIP_TARGET="."
+[ -n "$EXTRAS" ] && PIP_TARGET=".[${EXTRAS}]"
 
 if [ "$REINSTALL" = false ] && "$VENV_PY" -c "$CHECK_IMPORTS" &> /dev/null; then
     print_success "Dependências já instaladas (use --reinstall para atualizar)"
@@ -312,6 +322,9 @@ echo ""
 echo -e "  ${GREEN}${VENV_BIN}/python -m contador_dedos${NC}"
 echo ""
 print_info "Ou pelo comando instalado: ${GREEN}${VENV_BIN}/contador-dedos${NC}"
+if [ "$WEB" = true ]; then
+    print_info "Front web (só em 127.0.0.1): ${GREEN}${VENV_BIN}/contador-dedos-web${NC}"
+fi
 print_info "Ative o ambiente com:  ${GREEN}source ${VENV_BIN}/activate${NC}  (depois: ${GREEN}python -m contador_dedos${NC})"
 if [ "$DEV" = true ]; then
     echo ""

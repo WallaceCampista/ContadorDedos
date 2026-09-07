@@ -62,6 +62,41 @@ CONSENT_ACCEPT = "Aceito e quero cadastrar"
 CONSENT_CANCEL = "Cancelar"
 
 
+def draw_face_box(frame, face, nome, distancia, scale, capturing=False) -> None:
+    """Enquadra um rosto e escreve o nome reconhecido (ou "Desconhecido")."""
+    x, y, width, height = face.box
+    cor = COLOR_ACCENT if (nome or capturing) else COLOR_MUTED
+    cv2.rectangle(frame, (x, y), (x + width, y + height), cor, max(2, int(2 * scale)))
+    rotulo = nome or t(UNKNOWN_NAME)
+    if not capturing and nome:
+        rotulo = f"{rotulo}  ({distancia:.2f})"
+    draw_text(
+        frame,
+        rotulo,
+        (x, max(y - int(8 * scale), int(14 * scale))),
+        0.6 * scale,
+        cor,
+        max(1, int(scale)),
+    )
+
+
+def annotate_faces(frame, faces, embedder, db, threshold: float, scale: float) -> list:
+    """Reconhece e anota cada rosto do frame; devolve os nomes encontrados.
+
+    Compartilhada pelo modo da janela nativa e pelo front web — o reconhecimento
+    tem uma implementação só.
+    """
+    nomes = []
+    for face in faces:
+        aligned = align_face(frame, face)
+        if aligned is None:
+            continue
+        nome, distancia = db.match(embedder.embed(aligned), threshold)
+        nomes.append(nome)
+        draw_face_box(frame, face, nome, distancia, scale)
+    return nomes
+
+
 class Stage(Enum):
     """As telas por dentro do modo."""
 
@@ -251,14 +286,7 @@ class FaceId(Mode):
         return self._embedder.embed(aligned)
 
     def _recognize(self, frame, faces, scale: float) -> None:
-        nomes = []
-        for face in faces:
-            embedding = self._embed(frame, face)
-            if embedding is None:
-                continue
-            nome, distancia = self.db.match(embedding, self.threshold)
-            nomes.append(nome)
-            self._draw_face(frame, face, nome, distancia, scale)
+        nomes = annotate_faces(frame, faces, self._embedder, self.db, self.threshold, scale)
         if not faces:
             draw_center_message(frame, t("Nenhum rosto detectado"), scale)
         elif not self.db.names():
@@ -276,7 +304,7 @@ class FaceId(Mode):
             embedding = self._embed(frame, faces[0])
             if embedding is not None:
                 self._captured.append(embedding)
-            self._draw_face(frame, faces[0], self._typed, 0.0, scale, capturing=True)
+            draw_face_box(frame, faces[0], self._typed, 0.0, scale, capturing=True)
 
         progresso = t("Capturando {feitas}/{total}").format(
             feitas=len(self._captured), total=ENROLL_FRAMES
@@ -307,22 +335,6 @@ class FaceId(Mode):
         self.stage = Stage.RECOGNIZING
 
     # -- desenho ------------------------------------------------------------
-
-    def _draw_face(self, frame, face, nome, distancia, scale, capturing=False) -> None:
-        x, y, width, height = face.box
-        cor = COLOR_ACCENT if (nome or capturing) else COLOR_MUTED
-        cv2.rectangle(frame, (x, y), (x + width, y + height), cor, max(2, int(2 * scale)))
-        rotulo = nome or t(UNKNOWN_NAME)
-        if not capturing and nome:
-            rotulo = f"{rotulo}  ({distancia:.2f})"
-        draw_text(
-            frame,
-            rotulo,
-            (x, max(y - int(8 * scale), int(14 * scale))),
-            0.6 * scale,
-            cor,
-            max(1, int(scale)),
-        )
 
     def _add_button(self, frame, action: str, label: str, scale: float, bottom=False, index=0):
         height, width = frame.shape[:2]

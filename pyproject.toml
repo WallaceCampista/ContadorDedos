@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "contador-dedos"
-version = "0.5.0"
+version = "0.6.0"
 description = "Conta os dedos levantados em tempo real usando a webcam, com OpenCV e MediaPipe."
 readme = "README.md"
 license = "MIT"
@@ -41,6 +41,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Front web. Pesado e opcional — quem só usa o app nativo não paga.
+# `av` fixado em 12.3.0: é a última série com wheel para Python 3.9 em arm64.
+# Sem isso o pip tenta compilar o PyAV e exige pkg-config + headers do ffmpeg.
+web = [
+    "streamlit>=1.40,<2",
+    "streamlit-webrtc==0.53.10",
+    "av==12.3.0",
+]
 dev = [
     "pytest>=7.0",
     "ruff>=0.6",
@@ -53,6 +61,7 @@ Repository = "https://github.com/WallaceCampista/ContadorDedos"
 
 [project.scripts]
 contador-dedos = "contador_dedos:main"
+contador-dedos-web = "contador_dedos.web.launcher:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
